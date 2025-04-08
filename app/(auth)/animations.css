@@ -1,0 +1,56 @@
+/* Authentication page animations */
+.auth-form-appear {
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+.tab-content {
+  transform-origin: top center;
+  animation: fadeInDown 0.3s ease-out;
+}
+
+.tab-trigger {
+  position: relative;
+  overflow: hidden;
+}
+
+.tab-trigger::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: hsl(var(--primary));
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.tab-trigger[data-state="active"]::after {
+  transform: scaleX(1);
+}
+
+.social-button {
+  transition: all 0.2s ease;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

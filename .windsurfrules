@@ -1,0 +1,76 @@
+# TicketFast Project Rules
+
+## Architecture & Structure
+- Dont use any border colors or background colors in components. use default colors.
+- Maintain the Next.js app directory structure with route groups: (auth), (landing), and main
+- Follow file-based routing system for all new pages and endpoints
+- Keep API routes in the `/app/api` directory with proper RESTful design
+- Maintain clear separation between server and client components
+- Always reference the database schema in `db-schema.ts` for data model changes
+
+## Components & UI
+- Use Shadcn UI components with proper composition and customization
+- Leverage Radix UI primitives for accessible interactive components
+- Store reusable components in the `/components` directory with appropriate subdirectories
+- Implement UI component patterns from existing codebase for consistency
+- Ensure responsive design using Tailwind's mobile-first approach
+- Use Framer Motion for animations and transitions
+
+## State Management & Data Fetching
+- Prefer server components for data fetching where possible
+- Use React Server Components (RSC) for performance, SEO, and initial data fetching
+- Reserve client components only for interactive elements
+- Implement data fetching patterns with proper error handling
+- Use React Context or hooks from `/hooks` directory for shared state
+
+## Authentication & Authorization
+- Follow the auth patterns established with Better-Auth.js
+- Maintain proper user role checks for protected routes and actions
+- Use the middleware.ts for route protection and redirects
+- Implement proper validation for all user inputs
+- Ensure consistent error handling for auth flows
+
+## Database & API
+- Follow the Drizzle ORM patterns for database operations
+- Maintain consistency with the schema defined in `db-schema.ts`
+- Use transactions for operations that modify multiple tables
+- Include proper error handling for all database operations
+- Keep API routes consistent with RESTful principles
+- Validate all input data using Zod schemas
+
+## TypeScript & Code Quality
+- Use TypeScript for all new code
+- Define proper interfaces and types for all functions and components
+- Use barrel exports (index.ts) for cleaner imports
+- Avoid enums; use constant maps instead
+- Use lowercase with dashes for directory names (kebab-case)
+- Break large components and functions into smaller, reusable parts
+- Implement proper error handling and input validation
+
+## Styling & CSS
+- Use Shadcn's Components for UI
+- Use Tailwind CSS for all styling following utility-first approach
+- Follow Tailwind class naming conventions
+- Maintain consistent spacing using Tailwind's spacing scale
+- Implement dark mode support using Tailwind's dark variant
+- Keep component styles modular and reusable
+- Optimize component bundle size through proper code splitting
+
+## Performance & SEO
+- Optimize Server-Side Rendering (SSR) and Static Site Generation (SSG) appropriately
+- Add loading.tsx files for loading states
+- Implement custom error.tsx pages for graceful error handling
+- Optimize Web Vitals (LCP, CLS, FID)
+- Add proper metadata to all pages for SEO
+
+## Subscription & Business Logic
+- Maintain subscription plan logic according to defined quotas
+- Implement proper validation for subscription-based feature access
+- Follow established patterns for team and user management
+- Ensure proper error handling for subscription-related operations
+
+## Testing & Debugging
+- When debugging issues, reflect on 5-7 possible sources of the problem
+- Distill those to 1-2 most likely causes before implementing fixes
+- Add appropriate logging to validate assumptions 
+- Maintain meaningful error messages for easier debugging

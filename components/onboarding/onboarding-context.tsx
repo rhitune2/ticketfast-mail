@@ -24,6 +24,7 @@ interface OnboardingData {
   // Organization step
   organizationName: string
   organizationLogo: File | null
+  organizationLogoUrl: string | null;
   invitations: { email: string; role: string }[]
 }
 
@@ -53,6 +54,7 @@ const defaultData: OnboardingData = {
 
   organizationName: "",
   organizationLogo: null,
+  organizationLogoUrl: null,
   invitations: [],
 }
 
@@ -62,9 +64,11 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<OnboardingData>(defaultData)
 
   const updateData = (newData: Partial<OnboardingData>) => {
-    setData((prevData) => ({ ...prevData, ...newData }))
-  }
-
+    setData(prevData => ({
+      ...prevData,
+      ...newData
+    }));
+  };
   const addInvitation = (email: string, role: string) => {
     setData((prevData) => ({
       ...prevData,

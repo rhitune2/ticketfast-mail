@@ -8,35 +8,33 @@ import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
-import { User } from "@/db"
+import type { User } from "@/db"
+import { useState } from "react"
 
 // Define the form schema
-const formSchema = z.object({
-  isUsingSmtp: z.boolean().default(false),
-  smtpHost: z.string().optional(),
-  smtpPort: z.string().optional(),
-  smtpUsername: z.string().optional(),
-  smtpPassword: z.string().optional(),
-  smtpSecure: z.boolean().default(true),
-  fromEmail: z.string().optional(),
-  fromName: z.string().optional(),
-})
+const formSchema = z
+  .object({
+    isUsingSmtp: z.boolean(),
+    smtpHost: z.string().optional(),
+    smtpPort: z.string().optional(),
+    smtpUsername: z.string().optional(),
+    smtpPassword: z.string().optional(),
+    smtpSecure: z.boolean(),
+    fromEmail: z.string().optional(),
+    fromName: z.string().optional(),
+  })
+  .strict()
   .refine(
     (data) => {
       if (data.isUsingSmtp) {
-        return (
-          !!data.smtpHost &&
-          !!data.smtpPort &&
-          !!data.smtpUsername &&
-          !!data.smtpPassword
-        )
+        return !!data.smtpHost && !!data.smtpPort && !!data.smtpUsername && !!data.smtpPassword
       }
       return true
     },
     {
       message: "SMTP details are required if SMTP is enabled",
       path: ["smtpHost"],
-    }
+    },
   )
 
 // Define the form values type from the schema
@@ -46,14 +44,14 @@ interface EmailStepProps {
   onNext: () => void
   onBack: () => void
   user: User & {
-    isUsingSmtp?: boolean;
-    smtpHost?: string;
-    smtpPort?: string;
-    smtpUsername?: string;
-    smtpPassword?: string;
-    smtpSecure?: boolean;
-    fromEmail?: string;
-    fromName?: string;
+    isUsingSmtp?: boolean
+    smtpHost?: string
+    smtpPort?: string
+    smtpUsername?: string
+    smtpPassword?: string
+    smtpSecure?: boolean
+    fromEmail?: string
+    fromName?: string
   }
 }
 
@@ -69,13 +67,15 @@ export function EmailStep({ onNext, onBack, user }: EmailStepProps) {
       smtpSecure: user?.smtpSecure !== undefined ? user.smtpSecure : true,
       fromEmail: user?.fromEmail || "",
       fromName: user?.fromName || "",
-    }
+    },
   })
 
   const isUsingSmtp = form.watch("isUsingSmtp")
+  const [isPending, setIsPending] = useState(false)
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
+      setIsPending(true)
       const response = await fetch("/api/onboarding/email-config", {
         method: "POST",
         headers: {
@@ -89,22 +89,28 @@ export function EmailStep({ onNext, onBack, user }: EmailStepProps) {
       }
 
       toast.success("Email settings saved successfully!")
-      onNext();
+      onNext()
     } catch (error) {
       console.error("Error saving email settings:", error)
       toast.error("Failed to save email settings. Please try again.")
+    } finally {
+      setIsPending(false)
     }
   })
 
   return (
     <div className="space-y-6">
       <div className="mb-4">
-        <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">Email Configuration</h2>
-        <p className="text-slate-500 dark:text-slate-400 mt-2">Customize how emails are sent from your TicketFast account ( Optional )</p>
+        <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">
+          Email Configuration
+        </h2>
+        <p className="text-slate-500 dark:text-slate-400 mt-2">
+          Customize how emails are sent from your TicketFast account ( Optional )
+        </p>
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={onSubmit} className="space-y-6">
           <FormField
             control={form.control}
             name="isUsingSmtp"
@@ -229,25 +235,60 @@ export function EmailStep({ onNext, onBack, user }: EmailStepProps) {
           )}
 
           <div className="flex justify-between pt-4">
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={onBack}
               className="transition-all duration-200 hover:translate-x-[-2px]"
             >
-              <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className="mr-2 h-4 w-4"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
               Back
             </Button>
-            <Button 
+            <Button
               type="submit"
+              disabled={isPending}
               className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary hover:shadow-md transition-all duration-200 hover:translate-x-[2px]"
             >
-              Continue
-              <svg className="ml-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
+              {isPending ? (
+                <>
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25" cx="12" cy="12"r="10" stroke="currentColor"strokeWidth="4" ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  Continue
+                  <svg
+                    className="ml-2 h-4 w-4"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </>
+              )}
             </Button>
           </div>
         </form>

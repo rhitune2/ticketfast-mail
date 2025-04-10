@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { useEffect, useState } from "react";
 import { User } from "@/db";
+import { Loader2, ArrowRight } from "lucide-react";
 
 const formSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
@@ -43,6 +44,7 @@ interface UserStepProps {
 }
 
 export function UserStep({ onNext, user }: UserStepProps) {
+  const [isLoading, setIsLoading] = useState(false);
   const form = useForm<UserFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -56,20 +58,40 @@ export function UserStep({ onNext, user }: UserStepProps) {
   });
 
   async function onSubmit(values: UserFormValues) {
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch(`/api/onboarding/user`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(values),
+      });
 
-    const response = await fetch(`/api/onboarding/user`, {
-      method: "POST",
-      body: JSON.stringify(values),
-    });
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
 
-    const result = await response.json();
+      const result = await response.json();
 
-    if (!result.status) {
-      toast.error(result.message);
-      return;
+      if (!result.status) {
+        toast.error(result.message || "Failed to save user information");
+        return;
+      }
+
+      toast.success("User information saved successfully");
+      onNext();
+    } catch (error) {
+      console.error("Error saving user information:", error);
+      toast.error(
+        error instanceof Error 
+          ? `Error: ${error.message}` 
+          : "An error occurred while saving your information"
+      );
+    } finally {
+      setIsLoading(false);
     }
-
-    onNext();
   }
 
   return (
@@ -214,7 +236,19 @@ export function UserStep({ onNext, user }: UserStepProps) {
           />
 
           <div className="flex justify-end">
-            <Button type="submit">Save</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  Continue
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </Button>
           </div>
         </form>
       </Form>

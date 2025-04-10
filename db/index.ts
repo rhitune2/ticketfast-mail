@@ -1,5 +1,5 @@
 import { drizzle  } from 'drizzle-orm/postgres-js';
-import { type InferSelectModel, type InferInsertModel } from 'drizzle-orm'
+import { type InferSelectModel } from 'drizzle-orm'
 import postgres from 'postgres';
 import * as schema from "@/db-schema"
 
@@ -21,3 +21,4 @@ export * from "@/db-schema"
 
 
 export type User = InferSelectModel<typeof schema.user>
+export type Organization = InferSelectModel<typeof schema.organization>

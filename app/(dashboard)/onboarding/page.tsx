@@ -3,7 +3,6 @@ import { db, User } from "@/db";
 import { auth } from "@/lib/auth";
 import { Metadata } from "next";
 import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
@@ -12,17 +11,21 @@ export const metadata: Metadata = {
 };
 
 export default async function OnboardingPage() {
-
   const session = await auth.api.getSession({ headers: await headers() });
 
-  if(!session){
-    redirect("/sign-in")
+  if (!session) {
+    redirect("/sign-in");
   }
 
-  const activeUser = await db.query.user.findFirst({
-    where: (user, { eq }) => eq(user.id, session?.user?.id!)
-  }) as User;
+  const activeUser = (await db.query.user.findFirst({
+    where: (user, { eq }) => eq(user.id, session?.user?.id!),
+  })) as User;
 
+  const activeOrganization = await auth.api.getFullOrganization({
+    headers: await headers(),
+  });
 
-  return <OnboardingWizard user={activeUser} />;
+  return (
+    <OnboardingWizard user={activeUser} organization={activeOrganization} />
+  );
 }

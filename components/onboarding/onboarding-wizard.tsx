@@ -2,21 +2,23 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { UserStep } from "@/components/onboarding/steps/user-step";
-import { EmailStep } from "@/components/onboarding/steps/email-step";
-import { OrganizationStep } from "@/components/onboarding/steps/organization-step";
-import { StepIndicator } from "@/components/onboarding/step-indicator";
-import { Card, CardContent } from "@/components/ui/card";
-import { OnboardingProvider } from "@/components/onboarding/onboarding-context";
-import type { User } from "@/db";
+import { UserStep } from "./steps/user-step";
+import { EmailStep } from "./steps/email-step";
+import { OrganizationStep } from "./steps/organization-step";
+import { InviteStep } from "./steps/invite-step";
+import { StepIndicator } from "./step-indicator";
+import { Card, CardContent } from "../ui/card";
+import { OnboardingProvider } from "./onboarding-context";
+import type { User, Organization } from "@/db";
 
 const steps = [
   { id: "user", title: "User Information" },
   { id: "email", title: "Email Configuration" },
   { id: "organization", title: "Organization Setup" },
+  { id: "invitations", title: "Team Invitations" },
 ];
 
-export function OnboardingWizard({ user }: { user: User }) {
+export function OnboardingWizard({ user, organization }: { user: User, organization: Organization }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [animationDirection, setAnimationDirection] = useState<"next" | "prev">(
     "next"
@@ -120,7 +122,18 @@ export function OnboardingWizard({ user }: { user: User }) {
                       />
                     )}
                     {currentStep === 2 && (
-                      <OrganizationStep onBack={goToPreviousStep} user={user} />
+                      <OrganizationStep 
+                        onBack={goToPreviousStep} 
+                        onNext={goToNextStep}
+                        user={user} 
+                        organization={organization}
+                      />
+                    )}
+                    {currentStep === 3 && (
+                      <InviteStep 
+                        onBack={goToPreviousStep} 
+                        user={user} 
+                      />
                     )}
                   </motion.div>
                 </AnimatePresence>

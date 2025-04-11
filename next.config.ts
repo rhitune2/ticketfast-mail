@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     POLAR_ACCESS_TOKEN: process.env.POLAR_ACCESS_TOKEN,
+    MAILGUN_API_KEY: process.env.MAILGUN_API_KEY,
   },
 };
 

@@ -10,18 +10,37 @@ import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import type { User } from "@/db"
 import { useState } from "react"
+import { Loader2, ArrowRight, ArrowLeft } from "lucide-react"
 
 // Define the form schema
 const formSchema = z
   .object({
     isUsingSmtp: z.boolean(),
-    smtpHost: z.string().optional(),
-    smtpPort: z.string().optional(),
-    smtpUsername: z.string().optional(),
-    smtpPassword: z.string().optional(),
+    smtpHost: z.string().optional()
+      .refine(value => !value || value.length >= 2, {
+        message: "SMTP host must be at least 2 characters"
+      }),
+    smtpPort: z.string().optional()
+      .refine(value => !value || /^\d+$/.test(value), {
+        message: "SMTP port must be a number"
+      }),
+    smtpUsername: z.string().optional()
+      .refine(value => !value || value.length >= 2, {
+        message: "SMTP username must be at least 2 characters"
+      }),
+    smtpPassword: z.string().optional()
+      .refine(value => !value || value.length >= 4, {
+        message: "SMTP password must be at least 4 characters"
+      }),
     smtpSecure: z.boolean(),
-    fromEmail: z.string().optional(),
-    fromName: z.string().optional(),
+    fromEmail: z.union([
+      z.string().email("Invalid email format"),
+      z.string().max(0)
+    ]).optional(),
+    fromName: z.string().optional()
+      .refine(value => !value || value.length >= 2, {
+        message: "From name must be at least 2 characters"
+      }),
   })
   .strict()
   .refine(
@@ -36,6 +55,20 @@ const formSchema = z
       path: ["smtpHost"],
     },
   )
+  .superRefine((data, ctx) => {
+    // Only validate fromEmail if SMTP is enabled and a value is provided
+    if (data.isUsingSmtp && data.fromEmail && data.fromEmail.length > 0) {
+      try {
+        z.string().email().parse(data.fromEmail);
+      } catch (error) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Invalid email format",
+          path: ["fromEmail"]
+        });
+      }
+    }
+  })
 
 // Define the form values type from the schema
 type EmailFormValues = z.infer<typeof formSchema>
@@ -85,14 +118,38 @@ export function EmailStep({ onNext, onBack, user }: EmailStepProps) {
       })
 
       if (!response.ok) {
-        throw new Error("Failed to save email settings")
+        const errorText = await response.text()
+        throw new Error(`HTTP error! Status: ${response.status}, Message: ${errorText || "Unknown error"}`)
       }
 
-      toast.success("Email settings saved successfully!")
+      const result = await response.json()
+
+      if (!result.status) {
+        toast.error(result.message || "Failed to save email settings")
+        return
+      }
+
+      toast.success(result.message || "Email settings saved successfully!")
       onNext()
     } catch (error) {
       console.error("Error saving email settings:", error)
-      toast.error("Failed to save email settings. Please try again.")
+      toast.error(
+        error instanceof Error 
+          ? `Error: ${error.message}` 
+          : "Failed to save email settings. Please try again."
+      )
+      
+      // If there are validation errors, they will be shown in the form
+      if (error instanceof z.ZodError) {
+        error.errors.forEach(err => {
+          if (err.path) {
+            form.setError(err.path.join(".") as any, { 
+              type: "manual", 
+              message: err.message 
+            })
+          }
+        })
+      }
     } finally {
       setIsPending(false)
     }
@@ -210,7 +267,7 @@ export function EmailStep({ onNext, onBack, user }: EmailStepProps) {
                     <FormItem>
                       <FormLabel>From Email (Optional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="support@yourcompany.com" {...field} />
+                        <Input placeholder="support@yourcompany.com" {...field} value={field.value || ""} />
                       </FormControl>
                       <FormDescription className="text-xs">Leave blank to use system default</FormDescription>
                       <FormMessage />
@@ -239,54 +296,25 @@ export function EmailStep({ onNext, onBack, user }: EmailStepProps) {
               type="button"
               variant="outline"
               onClick={onBack}
+              disabled={isPending}
               className="transition-all duration-200 hover:translate-x-[-2px]"
             >
-              <svg
-                className="mr-2 h-4 w-4"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
+              <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
             <Button
               type="submit"
               disabled={isPending}
-              className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary hover:shadow-md transition-all duration-200 hover:translate-x-[2px]"
             >
               {isPending ? (
                 <>
-                  <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25" cx="12" cy="12"r="10" stroke="currentColor"strokeWidth="4" ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Saving...
                 </>
               ) : (
                 <>
                   Continue
-                  <svg
-                    className="ml-2 h-4 w-4"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </>
               )}
             </Button>

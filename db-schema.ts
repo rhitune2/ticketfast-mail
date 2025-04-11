@@ -17,7 +17,7 @@ export const user = pgTable("user", {
 	communicationType: text('communication_type'),
 
 	isUsingSmtp: boolean('is_using_smtp').notNull().default(false),
-
+  themePreference:text('theme_preference').default('system'),
 
 	createdAt: timestamp('created_at').notNull(),
 	updatedAt: timestamp('updated_at').notNull(),

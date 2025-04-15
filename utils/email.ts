@@ -5,11 +5,13 @@ import { eq } from "drizzle-orm";
 import mailgun from "mailgun-js";
 import { render } from "@react-email/render";
 import { VerificationTemplate } from "./email-templates/verification-template";
+import { OrganizationInviteTemplate } from "./email-templates/organization-invite-template";
+import { auth } from "@/lib/auth";
 
 /**
  * Email template types supported by the application
  */
-type Template = "verification-template" | "otp-template";
+type Template = "verification-template" | "otp-template" | "organization-invite-template";
 
 /**
  * Interface for email sending props
@@ -29,15 +31,27 @@ interface VerificationEmailTemplateProps {
 }
 
 /**
+ * Interface for organization invitation email template props
+ */
+interface OrganizationInviteEmailTemplateProps {
+  inviteLink: string;
+  teamName: string;
+  invitedByUsername: string;
+  invitedByEmail: string;
+}
+
+/**
  * Renders an email template based on the template name and props
  * @param template The template identifier
  * @param props The props to pass to the template
  * @returns HTML string of the rendered email
  */
-async function renderEmailTemplate(template: Template, props: VerificationEmailTemplateProps): Promise<string> {
+async function renderEmailTemplate(template: Template, props: any): Promise<string> {
   switch (template) {
     case "verification-template":
-      return render(VerificationTemplate(props));
+      return render(VerificationTemplate(props as VerificationEmailTemplateProps));
+    case "organization-invite-template":
+      return render(OrganizationInviteTemplate(props as OrganizationInviteEmailTemplateProps));
     default:
       throw new Error(`Unknown email template: ${template}`);
   }
@@ -84,6 +98,59 @@ export async function sendVerification({
     return result;
   } catch (error) {
     console.error("Failed to send verification email:", error);
+    throw error;
+  }
+}
+
+/**
+ * Interface for organization invitation email props
+ */
+interface SendOrganizationInvitationProps {
+  email: string;
+  inviteLink: string;
+  teamName: string;
+  invitedByUsername: string;
+  invitedByEmail: string;
+}
+
+/**
+ * Sends an organization invitation email
+ * @param params The invitation email parameters
+ * @returns The result of the email sending operation
+ */
+export async function sendOrganizationInvitation({
+  email,
+  inviteLink,
+  teamName,
+  invitedByUsername,
+  invitedByEmail,
+}: SendOrganizationInvitationProps): Promise<any> {
+  try {
+    // Render the email template using React Email
+    const htmlContent = await renderEmailTemplate("organization-invite-template", {
+      inviteLink,
+      teamName,
+      invitedByUsername,
+      invitedByEmail,
+    });
+
+    // Send the email using Mailgun
+    const mg = mailgun({
+      apiKey: process.env.MAILGUN_API_KEY || "",
+      domain: "ticketfa.st",
+    });
+
+    const result = await mg.messages().send({
+      from: process.env.FROM_ADDRESS || "no-reply@ticketfa.st",
+      to: email,
+      subject: `You've been invited to join ${teamName} on TicketFast`,
+      html: htmlContent,
+    });
+
+    console.log("Invitation email sent successfully to:", email);
+    return result;
+  } catch (error) {
+    console.error("Failed to send organization invitation email:", error);
     throw error;
   }
 }

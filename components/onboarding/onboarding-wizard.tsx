@@ -18,7 +18,7 @@ const steps = [
   { id: "invitations", title: "Team Invitations" },
 ];
 
-export function OnboardingWizard({ user, organization }: { user: User, organization: Organization }) {
+export function OnboardingWizard({ user, organization }: { user: User, organization?: Organization | null }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [animationDirection, setAnimationDirection] = useState<"next" | "prev">(
     "next"

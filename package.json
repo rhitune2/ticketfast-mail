@@ -42,7 +42,7 @@
     "@react-email/render": "^1.0.6",
     "@supabase/supabase-js": "^2.49.4",
     "@types/uuid": "^10.0.0",
-    "better-auth": "^1.2.5",
+    "better-auth": "^1.2.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

@@ -4,7 +4,6 @@ import { SignInForm } from "@/components/auth/sign-in-form";
 import { SignUpForm } from "@/components/auth/sign-up-form";
 import Image from "next/image";
 import "../animations.css";
-import { cn } from "@/lib/utils";
 
 export default function AuthPage() {
   return (
@@ -21,12 +20,18 @@ export default function AuthPage() {
             </p>
           </div>
 
-          <Tabs defaultValue="sign-in" className="w-full">
+          <Tabs defaultValue="sign-up" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="sign-in" className="tab-trigger rounded-md transition-all duration-300">
+              <TabsTrigger
+                value="sign-in"
+                className="tab-trigger rounded-md transition-all duration-300"
+              >
                 Sign In
               </TabsTrigger>
-              <TabsTrigger value="sign-up" className="tab-trigger rounded-md transition-all duration-300">
+              <TabsTrigger
+                value="sign-up"
+                className="tab-trigger rounded-md transition-all duration-300"
+              >
                 Sign Up
               </TabsTrigger>
             </TabsList>

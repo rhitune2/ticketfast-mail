@@ -1,17 +1,39 @@
-export const SUBSCRIPTION_QUOTAS = {
+export type SubscriptionPlan = 'FREE' | 'PRO' | 'ENTERPRISE';
+
+export interface OrganizationQuota {
+  quota: number;
+  memberQuota: number;
+}
+
+export interface SubscriptionQuota {
+  ticketQuota: number;
+  customerQuota: number;
+  organization: OrganizationQuota;
+}
+
+export const SUBSCRIPTION_QUOTAS: Record<SubscriptionPlan, SubscriptionQuota> = {
   FREE: {
     ticketQuota: 100,
-    organizationQuota: 1,
     customerQuota: 10,
+    organization: {
+      quota: 1,
+      memberQuota: 3,
+    },
   },
-  BASIC: {
+  PRO: {
     ticketQuota: 500,
-    organizationQuota: 3,
     customerQuota: 50,
+    organization: {
+      quota: 3,
+      memberQuota: 10,
+    },
   },
-  PREMIUM: {
+  ENTERPRISE: {
     ticketQuota: 2000,
-    organizationQuota: 10,
     customerQuota: 200,
+    organization: {
+      quota: 10,
+      memberQuota: 50,
+    },
   },
 };

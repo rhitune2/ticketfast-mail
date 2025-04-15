@@ -19,14 +19,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Loader2 } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
 import { SignInGoogleButton } from "./sign-in-google";
 import { authClient } from "@/lib/auth-client";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
   password: z.string().min(1, { message: "Password is required" }),
-  rememberMe: z.boolean().default(false),
+  // rememberMe: z.boolean().optional().default(false)
 });
 
 export function SignInForm() {
@@ -38,7 +37,7 @@ export function SignInForm() {
     defaultValues: {
       email: "",
       password: "",
-      rememberMe: false,
+      // rememberMe: false,
     },
   });
 
@@ -50,7 +49,7 @@ export function SignInForm() {
         email: values.email,
         password: values.password,
         callbackURL: "/dashboard",
-        rememberMe: values.rememberMe
+        // rememberMe: values.rememberMe
       }, {
         onSuccess: () => {
           router.push("/dashboard");
@@ -156,7 +155,7 @@ export function SignInForm() {
               )}
             />
 
-            <FormField
+            {/* <FormField
               control={form.control}
               name="rememberMe"
               render={({ field }) => (
@@ -173,7 +172,7 @@ export function SignInForm() {
                   </FormLabel>
                 </FormItem>
               )}
-            />
+            /> */}
 
             <Button
               type="submit"

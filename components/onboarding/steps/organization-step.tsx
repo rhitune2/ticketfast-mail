@@ -35,7 +35,7 @@ interface OrganizationStepProps {
   onBack: () => void;
   onNext?: () => void;
   user: User;
-  organization: Organization;
+  organization?: Organization | null;
 }
 
 export function OrganizationStep({
@@ -51,11 +51,15 @@ export function OrganizationStep({
   const form = useForm<OrganizationFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      organizationName: organization.name || "",
-      organizationLogo: organization.logo || null,
+      organizationName: "",
+      organizationLogo: null,
     },
+    values: organization ? {
+      organizationName: organization.name ?? "",
+      organizationLogo: organization.logo ?? null,
+    } : undefined
   });
-
+  
   async function onSubmit(values: OrganizationFormValues) {
     try {
       setIsSubmitting(true);
@@ -68,7 +72,7 @@ export function OrganizationStep({
         },
         body: JSON.stringify({
           organizationName: values.organizationName,
-          organizationLogo: logoUrl, // Send the URL instead of the file name
+          organizationLogo: logoUrl ?? organization?.logo, // Send the URL instead of the file name
         }),
       });
 
@@ -154,7 +158,7 @@ export function OrganizationStep({
                     onUrlChange={(url) => {
                       setLogoUrl(url);
                     }}
-                    existingUrl={organization.logo || undefined} // Convert null to undefined
+                    existingUrl={organization?.logo || undefined}
                     userId={user.id}
                   />
                 </FormControl>

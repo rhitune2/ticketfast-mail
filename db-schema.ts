@@ -5,6 +5,7 @@ import {
   timestamp,
   boolean,
 } from "drizzle-orm/pg-core";
+import { SUBSCRIPTION_QUOTAS } from "./lib/constants";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -23,9 +24,61 @@ export const user = pgTable("user", {
   communicationType: text("communication_type"),
 
   isUsingSmtp: boolean("is_using_smtp").notNull().default(false),
+  isCompletedOnboarding: boolean("is_completed_onboarding").default(false),
 
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
+});
+
+export const subscription = pgTable("subscriptions", {
+  id: text("id").primaryKey(),
+
+  // Free , Pro , Enterprise
+  plan: text("plan").notNull().default("FREE"),
+
+  // ACTIVE
+  status: text("status").notNull().default("ACTIVE"),
+
+  // default 100
+  ticketQuota: integer("ticket_quota")
+    .notNull()
+    .default(SUBSCRIPTION_QUOTAS.FREE.ticketQuota),
+
+  // default 10
+  customerQuota: integer("customer_quota")
+    .notNull()
+    .default(SUBSCRIPTION_QUOTAS.FREE.customerQuota),
+
+  // default 3
+  organizationQuota: integer("organization_quota")
+    .notNull()
+    .default(SUBSCRIPTION_QUOTAS.FREE.organization.quota),
+
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const inbox = pgTable("inbox", {
+  id: text("id").primaryKey(),
+
+  // default organization name and slug
+  name: text("name").notNull(),
+  slug: text("slug").notNull(),
+
+  // slugify organization name + random string @ticketfa.st for default.
+  emailAddress: text("email_adress").notNull().unique(),
+
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const session = pgTable("session", {
@@ -116,8 +169,8 @@ export const team = pgTable("team", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   organizationId: text("organization_id")
-	.notNull()
-	.references(() => organization.id, { onDelete: "cascade" }),
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at"),
 });
@@ -140,4 +193,82 @@ export const smtpSettings = pgTable("smtp_settings", {
   }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull(),
+});
+
+export const ticket = pgTable("ticket", {
+  id: text("id").primaryKey(),
+
+  subject: text("subject").notNull(),
+
+  // ASSIGNED , UNASSIGNED , WAITING,  CLOSED
+  status: text("status").default("UNASSIGNED").notNull(),
+
+  // LOW NORMAL MEDIUM HIGH
+  priority: text("priority").default("NORMAL").notNull(),
+
+  fromEmail: text("from_email"),
+  fromName: text("from_name"),
+  toEmail: text("to_email"),
+  ccEmails: text("cc_emails"),
+  bccEmails: text("bcc_emails"),
+
+  inboxId: text("inbox_id")
+    .notNull()
+    .references(() => inbox.id),
+
+  // team member assigne id
+  assigneeId: text("assignee_id").references(() => user.id),
+
+  // creator of organization
+  creatorId: text("creator_id").references(() => user.id),
+  contactId: text("contact_id").references(() => contact.id),
+
+  organizationId: text("organization_id").references(() => organization.id, {
+    onDelete: "cascade",
+  }),
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull(),
+});
+
+export const contact = pgTable("contacts", {
+  id: text("id").primaryKey(),
+
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  fullName: text("full_name"),
+
+  email: text("email").notNull().unique(),
+  phoneNumber: text("phone_number"),
+  company: text("company"),
+  notes: text("notes"),
+
+  createdById: text("created_by_id").references(() => user.id),
+  organizationId: text("organization_id").references(() => organization.id, {
+    onDelete: "cascade",
+  }),
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull(),
+});
+
+export const ticketMessage = pgTable("ticket_message", {
+  id: text("id").primaryKey(),
+  content: text("content").notNull(), // HTML or text content of the email
+  contentType: text("content_type").notNull().default("text/html"), // Content type (html or plain text)
+  
+  // Metadata
+  fromName: text("from_name"),
+  fromEmail: text("from_email"),
+  isInternal: boolean("is_internal").notNull().default(false),
+  isAgent: boolean("is_agent").notNull().default(false),
+  
+  // Foreign key to ticket
+  ticketId: text("ticket_id")
+    .notNull()
+    .references(() => ticket.id, { onDelete: "cascade" }),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

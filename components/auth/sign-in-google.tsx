@@ -3,7 +3,11 @@ import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 import { Loader2 } from "lucide-react";
 
-export const SignInGoogleButton = () => {
+interface SignInGoogleButtonProps {
+  redirectUrl?: string;
+}
+
+export const SignInGoogleButton = ({ redirectUrl }: SignInGoogleButtonProps = {}) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignIn = async () => {
@@ -11,9 +15,9 @@ export const SignInGoogleButton = () => {
       setIsLoading(true);
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/dashboard",
+        callbackURL: redirectUrl,
         errorCallbackURL: "/error",
-        newUserCallbackURL: "/onboarding",
+        newUserCallbackURL: redirectUrl ?? "/onboarding",
       });
     } catch (error) {
       console.error("Google sign-in error:", error);

@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 
 const schema = z.object({
   organizationName: z.string().min(2),
-  organizationLogo: z.string(),
+  organizationLogo: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
         body : {
           data: {
             name: parsedBody.organizationName,
-            logo: parsedBody.organizationLogo,
+            logo: parsedBody.organizationLogo ?? "",
           },
           organizationId: existingOrg.id,
         },
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
         body:{
           name: parsedBody.organizationName,
           slug: slugify(parsedBody.organizationName),
-          logo: parsedBody.organizationLogo,
+          logo: parsedBody.organizationLogo ?? "",
         },
         headers: await headers(),
       });

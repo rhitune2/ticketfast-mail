@@ -24,3 +24,4 @@ export type User = InferSelectModel<typeof schema.user>
 export type Organization = InferSelectModel<typeof schema.organization>
 export type Subscription = InferSelectModel<typeof schema.subscription>
 export type Inbox = InferSelectModel<typeof schema.inbox>
+export type Ticket = InferSelectModel<typeof schema.ticket>

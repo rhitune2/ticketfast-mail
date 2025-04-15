@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { eq } from "drizzle-orm";
-import { inbox, subscription, user, member } from "@/db-schema";
+import { inbox, subscription, user, member, organization } from "@/db-schema";
 import { auth } from "./auth";
 import { headers } from "next/headers";
 import type { Inbox, Organization, Subscription, User } from "@/db";
@@ -16,9 +16,17 @@ export async function getActiveOrganization(
   try {
     // Get the user's active organization directly from the API
     // Using getFullOrganization which is the correct method based on the error message
-    const response = await auth.api.getFullOrganization({
-      headers: await headers(),
-    });
+    const currentMember = await db.query.member.findFirst({
+      where: eq(member.userId, userId),
+    })
+
+    if(!currentMember){
+      return null;
+    }
+
+    const response = await db.query.organization.findFirst({
+      where: eq(organization.id, currentMember.organizationId),
+    })
 
     // Check if we got a valid response with organization data
     if (!response || !response.id) {
@@ -27,7 +35,7 @@ export async function getActiveOrganization(
     }
 
     // Map the API response to our Organization type
-    const organization: Organization = {
+    const activeOrganization: Organization = {
       id: response.id,
       name: response.name,
       slug: response.slug || "",
@@ -36,8 +44,7 @@ export async function getActiveOrganization(
       createdAt: response.createdAt,
     };
 
-    console.log("Found organization:", organization);
-    return organization;
+    return activeOrganization;
   } catch (error) {
     console.error("Error getting organization:", error);
     return null;

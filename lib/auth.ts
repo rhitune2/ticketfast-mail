@@ -124,6 +124,15 @@ export const auth = betterAuth({
             headers: await headers(),
           });
 
+          // we should set activeorganization id for session
+
+          await auth.api.setActiveOrganization({
+            body : {
+              organizationId: userOrganization?.id
+            },
+            headers: await headers()
+          })
+
           await createDefaultInbox(currentUser.id);
 
           if (!userOrganization) {

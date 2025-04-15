@@ -167,6 +167,7 @@ async function handleInboundMail(data: MailgunData) {
       fromName: fromName,
       toEmail: toEmail,
       inboxId: targetInbox.id,
+      creatorId: targetInbox.userId,
       createdAt: new Date(),
       updatedAt: new Date()
     };

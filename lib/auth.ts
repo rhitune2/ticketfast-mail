@@ -190,7 +190,7 @@ export const auth = betterAuth({
         return userOrganizationCount >= maxOrganizations;
       },
       async sendInvitationEmail(data) {
-        const inviteLink = `http://localhost:3000/accept-invitation/${data.id}`;
+        const inviteLink = `${process.env.NODE_ENV === "development"  ? "http://localhost:3000" : "https://ticketfast-mail.vercel.app"}/accept-invitation/${data.id}`;
         await sendOrganizationInvitation({
           email: data.email,
           invitedByUsername: data.inviter.user.name,

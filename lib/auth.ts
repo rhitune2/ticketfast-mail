@@ -26,7 +26,7 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
   }),
-  trustedOrigins: ["http://localhost:3000", "https://ticketfast-mail.vercel.app"],
+  trustedOrigins: ["http://localhost:3000", "https://ticketfa.st"],
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
       if (ctx.path.startsWith("/organization/accept-invitation")) {
@@ -199,7 +199,7 @@ export const auth = betterAuth({
         return userOrganizationCount >= maxOrganizations;
       },
       async sendInvitationEmail(data) {
-        const inviteLink = `${process.env.NODE_ENV === "development"  ? "http://localhost:3000" : "https://ticketfast-mail.vercel.app"}/accept-invitation/${data.id}`;
+        const inviteLink = `${process.env.NODE_ENV === "development"  ? "http://localhost:3000" : "https://ticketfa.st"}/accept-invitation/${data.id}`;
         await sendOrganizationInvitation({
           email: data.email,
           invitedByUsername: data.inviter.user.name,

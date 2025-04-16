@@ -112,7 +112,6 @@ export const auth = betterAuth({
         after: async (currentUser) => {
 
           // check if user is invited by
-
           const isInvited = await db.query.invitation.findFirst({
             where: eq(invitation.email, currentUser.email),
           })

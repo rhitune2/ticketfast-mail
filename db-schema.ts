@@ -6,6 +6,7 @@ import {
   boolean,
 } from "drizzle-orm/pg-core";
 import { SUBSCRIPTION_QUOTAS } from "./lib/constants";
+import { relations } from 'drizzle-orm';
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -223,6 +224,8 @@ export const ticket = pgTable("ticket", {
   creatorId: text("creator_id").references(() => user.id),
   contactId: text("contact_id").references(() => contact.id),
 
+  isOverQuota: boolean("is_over_quota").notNull().default(false),
+
   organizationId: text("organization_id").references(() => organization.id, {
     onDelete: "cascade",
   }),
@@ -297,3 +300,52 @@ export const ticketAttachment = pgTable("ticket_attachment", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const ticketRelations = relations(ticket, ({ one, many }) => ({
+  // ticket.contactId alanını kullanarak contact tablosuyla TEKİL ilişki
+  contact: one(contact, {
+    fields: [ticket.contactId],
+    references: [contact.id],
+  }),
+  // Örnek İlişkiler (İhtiyaca göre uncomment/düzenle)
+  assignee: one(user, {
+    fields: [ticket.assigneeId],
+    references: [user.id],
+    relationName: 'TicketAssignee',
+  }),
+  creator: one(user, {
+    fields: [ticket.creatorId],
+    references: [user.id],
+    relationName: 'TicketCreator',
+  }),
+  inbox: one(inbox, {
+      fields: [ticket.inboxId],
+      references: [inbox.id]
+  }),
+  messages: many(ticketMessage),
+  attachments: many(ticketAttachment),
+}));
+
+export const contactRelations = relations(contact, ({ many }) => ({
+  // contact'a bağlı ticket'ları getirmek için ÇOĞUL ilişki (ters ilişki)
+  tickets: many(ticket),
+}));
+
+export const ticketMessageRelations = relations(ticketMessage, ({ one, many }) => ({
+  ticket: one(ticket, {
+    fields: [ticketMessage.ticketId],
+    references: [ticket.id],
+  }),
+  attachments: many(ticketAttachment),
+}));
+
+export const ticketAttachmentRelations = relations(ticketAttachment, ({ one }) => ({
+  ticket: one(ticket, {
+    fields: [ticketAttachment.ticketId],
+    references: [ticket.id],
+  }),
+  message: one(ticketMessage, {
+    fields: [ticketAttachment.messageId],
+    references: [ticketMessage.id],
+  }),
+}));

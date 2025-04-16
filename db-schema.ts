@@ -272,3 +272,30 @@ export const ticketMessage = pgTable("ticket_message", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// Attachments table for storing email attachments
+export const ticketAttachment = pgTable("ticket_attachment", {
+  id: text("id").primaryKey(),
+  
+  // Attachment data
+  filename: text("filename").notNull(),
+  contentType: text("content_type").notNull(),
+  size: integer("size").notNull(),
+  checksum: text("checksum"),
+  content: text("content"),  // For storing smaller attachments directly, optional
+  
+  // Storage info
+  storageLocation: text("storage_location"), // URL or path to attachment if stored externally
+  storageProvider: text("storage_provider"), // e.g., 'local', 's3', etc.
+  
+  // Foreign keys
+  ticketId: text("ticket_id")
+    .notNull()
+    .references(() => ticket.id, { onDelete: "cascade" }),
+  messageId: text("message_id")
+    .references(() => ticketMessage.id, { onDelete: "cascade" }),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

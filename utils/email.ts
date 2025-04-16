@@ -1,4 +1,4 @@
-"use server"
+"use server";
 
 import { db, user } from "../db";
 import { eq } from "drizzle-orm";
@@ -6,12 +6,15 @@ import mailgun from "mailgun-js";
 import { render } from "@react-email/render";
 import { VerificationTemplate } from "./email-templates/verification-template";
 import { OrganizationInviteTemplate } from "./email-templates/organization-invite-template";
-import { auth } from "@/lib/auth";
+import nodemailer from "nodemailer";
 
 /**
  * Email template types supported by the application
  */
-type Template = "verification-template" | "otp-template" | "organization-invite-template";
+export type Template =
+  | "verification-template"
+  | "otp-template"
+  | "organization-invite-template";
 
 /**
  * Interface for email sending props
@@ -46,12 +49,21 @@ interface OrganizationInviteEmailTemplateProps {
  * @param props The props to pass to the template
  * @returns HTML string of the rendered email
  */
-async function renderEmailTemplate(template: Template, props: any): Promise<string> {
+async function renderEmailTemplate(
+  template: Template,
+  props: any
+): Promise<string> {
   switch (template) {
     case "verification-template":
-      return render(VerificationTemplate(props as VerificationEmailTemplateProps));
+      return render(
+        VerificationTemplate(props as VerificationEmailTemplateProps)
+      );
     case "organization-invite-template":
-      return render(OrganizationInviteTemplate(props as OrganizationInviteEmailTemplateProps));
+      return render(
+        OrganizationInviteTemplate(
+          props as OrganizationInviteEmailTemplateProps
+        )
+      );
     default:
       throw new Error(`Unknown email template: ${template}`);
   }
@@ -81,19 +93,27 @@ export async function sendVerification({
     // Render the email template using React Email
     const htmlContent = await renderEmailTemplate(template, { url });
 
-    // Send the email using Mailgun
-    const mg = mailgun({
-      apiKey: process.env.MAILGUN_API_KEY || "",
-      domain: "ticketfa.st",
+    // Send the email using Forward-Email API.
+
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.forwardemail.net',
+      port: 465,
+      secure: true,
+      auth: {
+        user: 'no-reply@ticketfa.st',
+        pass: process.env.EMAIL_PASSWORD
+      },
     });
 
-    const result = await mg.messages().send({
-      from: process.env.FROM_ADDRESS || "no-reply@ticketfa.st",
+    const options = {
+      from: "no-reply@ticketfa.st",
       to,
       subject,
       html: htmlContent,
-    });
+    };
 
+    const result = await transporter.sendMail(options)
+    
     console.log("Email sent successfully to:", to);
     return result;
   } catch (error) {
@@ -127,12 +147,15 @@ export async function sendOrganizationInvitation({
 }: SendOrganizationInvitationProps): Promise<any> {
   try {
     // Render the email template using React Email
-    const htmlContent = await renderEmailTemplate("organization-invite-template", {
-      inviteLink,
-      teamName,
-      invitedByUsername,
-      invitedByEmail,
-    });
+    const htmlContent = await renderEmailTemplate(
+      "organization-invite-template",
+      {
+        inviteLink,
+        teamName,
+        invitedByUsername,
+        invitedByEmail,
+      }
+    );
 
     // Send the email using Mailgun
     const mg = mailgun({

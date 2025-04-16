@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest",
     "drizzle:seed": "tsx --env-file=.env db/seed.ts"
   },
   "dependencies": {
@@ -103,10 +102,8 @@
     "@types/nodemailer": "^6.4.17",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^4.4.0",
     "jsdom": "^26.1.0",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "vite-tsconfig-paths": "^5.1.4"
+    "typescript": "^5"
   }
 }

@@ -217,19 +217,20 @@ async function handleInboundMail(data: ForwardEmailWebhook) {
     // Handle attachments if present
     if (data.attachments && data.attachments.length > 0) {
       const attachmentPromises = data.attachments.map(async (attachment) => {
-        // Convert Buffer data to base64 string if needed
-        let contentString = null;
+        // Convert Buffer data to base64 string for local storage
+        let blobString = null;
         if (attachment.content && attachment.content.data) {
           try {
             // Convert number array to Buffer and then to base64
             const buffer = Buffer.from(attachment.content.data);
-            contentString = buffer.toString('base64');
+            blobString = buffer.toString('base64');
+            console.log(`Converted attachment ${attachment.filename} to base64 (${blobString.length} chars)`);
           } catch (err) {
-            console.warn("Could not convert attachment content to string", err);
+            console.warn(`Could not convert attachment content to base64: ${err instanceof Error ? err.message : String(err)}`);
           }
         }
         
-        // Insert attachment record
+        // Insert attachment record with blob data stored directly
         return db.insert(ticketAttachment)
           .values({
             id: uuidv4(),
@@ -237,7 +238,7 @@ async function handleInboundMail(data: ForwardEmailWebhook) {
             contentType: attachment.contentType,
             size: attachment.size,
             checksum: attachment.checksum,
-            content: contentString, // Store small attachments directly
+            blobData: blobString, // Store the blob data directly in the database
             ticketId: ticketRecord.id,
             messageId: messageRecord.id,
             createdAt: new Date(),
@@ -247,8 +248,15 @@ async function handleInboundMail(data: ForwardEmailWebhook) {
       });
       
       // Wait for all attachment insertions to complete
-      await Promise.all(attachmentPromises);
-      console.log(`Stored ${data.attachments.length} attachments for ticket ${ticketRecord.id}`);
+      const attachmentResults = await Promise.all(attachmentPromises);
+      console.log(`Stored ${data.attachments.length} attachments directly in the database for ticket ${ticketRecord.id}`);
+      
+      // Log attachment storage details
+      attachmentResults.forEach((result, index) => {
+        if (result && result[0]) {
+          console.log(`Attachment ${index + 1} stored with ID: ${result[0].id}, Size: ${result[0].size} bytes`);
+        }
+      });
     }
     
     return NextResponse.json({ 

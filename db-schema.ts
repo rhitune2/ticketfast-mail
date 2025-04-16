@@ -282,11 +282,9 @@ export const ticketAttachment = pgTable("ticket_attachment", {
   contentType: text("content_type").notNull(),
   size: integer("size").notNull(),
   checksum: text("checksum"),
-  content: text("content"),  // For storing smaller attachments directly, optional
   
-  // Storage info
-  storageLocation: text("storage_location"), // URL or path to attachment if stored externally
-  storageProvider: text("storage_provider"), // e.g., 'local', 's3', etc.
+  // Blob data - Store the actual attachment content directly in the database
+  blobData: text("blob_data"),  // Base64 encoded attachment data
   
   // Foreign keys
   ticketId: text("ticket_id")

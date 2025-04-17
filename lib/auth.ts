@@ -261,18 +261,18 @@ export const auth = betterAuth({
             payload.data.product.name as "free" | "pro" | "enterprise"
           );
         },
-        onSubscriptionUpdated: async (payload) => {
-          const data = payload.data;
-          await createSubscription(
-            data,
-            data.product.name as "free" | "pro" | "enterprise"
-          );
-        },
-        onSubscriptionCanceled: async (payload) => {
-          const data = payload.data;
-          // we downgrading user's subscription to free
-          await createSubscription(data.user.email, "free");
-        },
+        // onSubscriptionUpdated: async (payload) => {
+        //   const data = payload.data;
+        //   await createSubscription(
+        //     data,
+        //     data.product.name as "free" | "pro" | "enterprise"
+        //   );
+        // },
+        // onSubscriptionCanceled: async (payload) => {
+        //   const data = payload.data;
+        //   // we downgrading user's subscription to free
+        //   await createSubscription(data.user.email, "free");
+        // },
       },
     }),
   ],

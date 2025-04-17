@@ -220,13 +220,18 @@ export async function createSubscription(
   type: "free" | "pro" | "enterprise"
 ): Promise<Subscription | null> {
 
+  // const client = new Polar({
+  //   accessToken:
+  //     process.env.NODE_ENV === "development"
+  //       ? process.env.POLAR_ACCESS_TOKEN_SANDBOX
+  //       : process.env.POLAR_ACCESS_TOKEN,
+  //   server: process.env.NODE_ENV === "development" ? "sandbox" : "production",
+  // });
+
   const client = new Polar({
-    accessToken:
-      process.env.NODE_ENV === "development"
-        ? process.env.POLAR_ACCESS_TOKEN_SANDBOX
-        : process.env.POLAR_ACCESS_TOKEN,
-    server: process.env.NODE_ENV === "development" ? "sandbox" : "production",
-  });
+    accessToken: process.env.POLAR_ACCESS_TOKEN_SANDBOX!,
+    server: "sandbox",
+  })
 
   const customer = await client.customers.get({
     id: payload.customer.id,

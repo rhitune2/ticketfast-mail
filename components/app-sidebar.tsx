@@ -2,14 +2,18 @@
 
 import * as React from "react"
 import {
+  BarChart2,
+  Inbox,
   LayoutDashboard,
-  Ticket,
-  Users,
-  Tag,
+  LifeBuoy,
+  MessageSquare,
+  Package,
   Settings,
+  Users,
+  Ticket,
+  Tag,
   HelpCircle,
   Command,
-  LifeBuoy,
   Send,
   ChevronsUpDown,
   LayoutTemplate
@@ -82,7 +86,6 @@ export function AppSidebar({
       url: "/dashboard",
       icon: LayoutDashboard,
       isActive: true,
-      items: [],
     },
     {
       title: "Tickets",

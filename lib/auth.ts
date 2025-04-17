@@ -18,8 +18,11 @@ import { eq } from "drizzle-orm";
 import { createAuthMiddleware } from "better-auth/api";
 
 const client = new Polar({
-  accessToken: process.env.POLAR_ACCESS_TOKEN,
-  server: "production",
+  accessToken:
+    process.env.NODE_ENV === "development"
+      ? process.env.POLAR_ACCESS_TOKEN_SANDBOX
+      : process.env.POLAR_ACCESS_TOKEN,
+  server: process.env.NODE_ENV === "development" ? "sandbox" : "production",
 });
 
 export const auth = betterAuth({
@@ -49,6 +52,12 @@ export const auth = betterAuth({
         type: "boolean",
         defaultValue: false,
       },
+    },
+  },
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60, // Cache duration in seconds
     },
   },
   emailAndPassword: {
@@ -110,14 +119,13 @@ export const auth = betterAuth({
       },
       update: {
         after: async (currentUser) => {
-
           // check if user is invited by
           const isInvited = await db.query.invitation.findFirst({
             where: eq(invitation.email, currentUser.email),
-          })
+          });
 
           // we dont create inbox because he is invited.
-          if(isInvited) return;
+          if (isInvited) return;
 
           const userOrganization = await auth.api.getFullOrganization({
             headers: await headers(),
@@ -126,11 +134,11 @@ export const auth = betterAuth({
           // we should set activeorganization id for session
 
           await auth.api.setActiveOrganization({
-            body : {
-              organizationId: userOrganization?.id
+            body: {
+              organizationId: userOrganization?.id,
             },
-            headers: await headers()
-          })
+            headers: await headers(),
+          });
 
           await createDefaultInbox(currentUser.id);
 
@@ -199,7 +207,7 @@ export const auth = betterAuth({
         return userOrganizationCount >= maxOrganizations;
       },
       async sendInvitationEmail(data) {
-        const inviteLink = `${process.env.NODE_ENV === "development"  ? "http://localhost:3000" : "https://ticketfa.st"}/accept-invitation/${data.id}`;
+        const inviteLink = `${process.env.NODE_ENV === "development" ? "http://localhost:3000" : "https://ticketfa.st"}/accept-invitation/${data.id}`;
         await sendOrganizationInvitation({
           email: data.email,
           invitedByUsername: data.inviter.user.name,
@@ -219,6 +227,40 @@ export const auth = betterAuth({
       client,
       createCustomerOnSignUp: true,
       enableCustomerPortal: true,
+      checkout: {
+        enabled: true,
+        products: [
+          {
+            productId: "54607f97-752d-45cf-8276-1741c8e654b6",
+            slug: "free",
+          },
+          {
+            productId:
+              process.env.NODE_ENV === "development"
+                ? "d73591b0-ed35-40ea-97dd-378f548754c0"
+                : "069a9886-ebdd-45c2-b540-a4d61b2281c8",
+            slug: "pro",
+          },
+          {
+            productId:
+              process.env.NODE_ENV === "development"
+                ? "d73591b0-ed35-40ea-97dd-378f548754c0"
+                : "f89a631f-0df1-4a40-95f8-e9661a4bbf13",
+            slug: "enterprise",
+          },
+        ],
+        successUrl: "/success?checkout_id={CHECKOUT_ID}",
+      },
+      webhooks: {
+        secret:
+          process.env.NODE_ENV === "development"
+            ? process.env.POLAR_WEBHOOK_SECRET_SANDBOX!
+            : process.env.POLAR_WEBHOOK_SECRET!,
+        onSubscriptionCreated: async (payload) => {
+          console.log("Subscription created:", payload);
+          console.log(payload.data)
+        },
+      },
     }),
   ],
 });

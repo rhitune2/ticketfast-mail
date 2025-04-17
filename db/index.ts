@@ -28,3 +28,4 @@ export type Contact = InferSelectModel<typeof schema.contact>;
 export type TicketMessage = InferSelectModel<typeof schema.ticketMessage>;
 export type TicketAttachment = InferSelectModel<typeof schema.ticketAttachment>;
 export type Member = InferSelectModel<typeof schema.member>;
+export type Session = InferSelectModel<typeof schema.session>;

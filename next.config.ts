@@ -10,12 +10,14 @@ const nextConfig: NextConfig = {
     POLAR_ACCESS_TOKEN: process.env.POLAR_ACCESS_TOKEN,
     MAILGUN_API_KEY: process.env.MAILGUN_API_KEY,
     EMAIL_PASSWORD: process.env.EMAIL_PASSWORD,
-    ANTHROPIC_API_KEY:  process.env.ANTHROPIC_API_KEY
+    ANTHROPIC_API_KEY:  process.env.ANTHROPIC_API_KEY,
+    POLAR_WEBHOOK_SECRET_SANDBOX: process.env.POLAR_WEBHOOK_SECRET_SANDBOX,
   },
   experimental: {
     serverActions: {
       bodySizeLimit: "5mb",
     },
+    useCache: true
   },
 };
 

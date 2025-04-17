@@ -18,15 +18,15 @@ export async function getActiveOrganization(
     // Using getFullOrganization which is the correct method based on the error message
     const currentMember = await db.query.member.findFirst({
       where: eq(member.userId, userId),
-    })
+    });
 
-    if(!currentMember){
+    if (!currentMember) {
       return null;
     }
 
     const response = await db.query.organization.findFirst({
       where: eq(organization.id, currentMember.organizationId),
-    })
+    });
 
     // Check if we got a valid response with organization data
     if (!response || !response.id) {
@@ -116,21 +116,24 @@ export async function createDefaultInbox(
   const randomString = Math.random().toString(36).substring(2, 10);
   const orgName = userOrganization.name || "Default";
   const orgSlug = slugify(orgName).toLowerCase();
-  
+
   const inboxName = `${orgName} Inbox`;
   const inboxSlug = `${orgSlug}-inbox`;
   const emailAddress = `${orgSlug}-${randomString}@ticketfa.st`;
 
   try {
-    const insertedInbox = await db.insert(inbox).values({
-      id: uuidv4(),
-      name: inboxName,
-      slug: inboxSlug,
-      emailAddress: emailAddress,
-      userId: userId,
-      organizationId: userOrganization.id,
-      createdAt: new Date(),
-    }).returning();
+    const insertedInbox = await db
+      .insert(inbox)
+      .values({
+        id: uuidv4(),
+        name: inboxName,
+        slug: inboxSlug,
+        emailAddress: emailAddress,
+        userId: userId,
+        organizationId: userOrganization.id,
+        createdAt: new Date(),
+      })
+      .returning();
 
     console.log("Created default inbox:", insertedInbox[0]);
     return insertedInbox[0];
@@ -140,7 +143,6 @@ export async function createDefaultInbox(
   }
 }
 
-
 export async function getOrganizationCount(userId: string): Promise<number> {
   if (!userId) return 0;
 
@@ -148,8 +150,32 @@ export async function getOrganizationCount(userId: string): Promise<number> {
     where: eq(member.userId, userId),
     columns: { organizationId: true },
   });
-  
+
   const uniqueOrgIds = new Set(organizations.map((org) => org.organizationId));
 
   return uniqueOrgIds.size;
+}
+
+export async function getOrganizationSubscription({
+  headers,
+}: {
+  headers: Headers;
+}): Promise<Subscription | null> {
+  const user = await auth.api.getSession({ headers });
+
+  if (!user) return null;
+
+  const userOrganization = await auth.api.getFullOrganization({
+    headers,
+  });
+
+  const owner = userOrganization?.members.find(
+    (member) => member.role === "owner"
+  );
+
+  const currentSubscription = await db.query.subscription.findFirst({
+    where: eq(subscription.userId, owner?.userId!),
+  });
+
+  return currentSubscription as Subscription | null;
 }

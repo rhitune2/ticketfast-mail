@@ -8,6 +8,8 @@ import {
   ticketMessage as ticketMessageSchema,
   ticketAttachment as ticketAttachmentSchema,
   subscription as subscriptionSchema,
+  subscription,
+  contact,
 } from "@/db";
 import {
   eq,
@@ -17,9 +19,10 @@ import {
   count,
   gte,
   InferSelectModel, // Import InferSelectModel
-  InferInsertModel, // Import InferInsertModel
+  InferInsertModel,
+  lt, // Import InferInsertModel
 } from "drizzle-orm";
-import { startOfMonth } from 'date-fns';
+import { addMonths, startOfMonth } from "date-fns";
 
 // Define interface for email data based on forward-email webhook structure
 interface ForwardEmailAttachment {
@@ -163,19 +166,22 @@ async function handleInboundMail(data: ForwardEmailWebhook) {
       if (targetInbox.organizationId) {
         existingContacts = await db
           .select()
-          .from(contactSchema)
+          .from(contact)
           .where(
             and(
-              eq(contactSchema.email, fromEmail),
-              eq(contactSchema.organizationId, targetInbox.organizationId)
+              eq(contact.email, fromEmail),
+              eq(contact.organizationId, targetInbox.organizationId)
             )
           );
       } else {
         existingContacts = await db
           .select()
-          .from(contactSchema)
+          .from(contact)
           .where(
-            and(eq(contactSchema.email, fromEmail), isNull(contactSchema.organizationId))
+            and(
+              eq(contact.email, fromEmail),
+              isNull(contact.organizationId)
+            )
           );
       }
 
@@ -185,45 +191,69 @@ async function handleInboundMail(data: ForwardEmailWebhook) {
 
       // If no contact found, create a new one
       if (!contactRecord) {
-        // 1. Get the current count of contacts for this organization
+        // 1. Get the count of contacts created within the current subscription period
         const contactCountResult = await db
           .select({ value: count() }) // Use count aggregation
-          .from(contactSchema) // Use schema alias
-          .where(eq(contactSchema.organizationId, targetInbox.organizationId)); // Use schema alias
-
-        const currentContactCount = contactCountResult[0].value;
-
-        // 2. Check current count against the user's customer quota limit
-        if (currentContactCount >= subscriptionT.customerQuota) { // Use >= comparison
-          console.warn(
-            `Customer limit reached for organization: ${targetInbox.organizationId}. User: ${targetInbox.userId}. Ticket will be saved without contact link.`
+          .from(contact)
+          .where(
+            and(
+              // Filter by organization or user (based on inbox)
+              eq(contact.organizationId, targetInbox.organizationId),
+              // Filter by current subscription period
+              gte(contact.createdAt, subscriptionT.createdAt), // Only count contacts created ON or AFTER subscription start
+              lt(contact.createdAt, addMonths(subscriptionT.createdAt, 1))             // Only count contacts created BEFORE the next billing cycle
+            )
           );
-          // contactRecord remains null, DO NOT return
-        } else {
-          // Create new contact
-          const contactData: NewContact = { // Use defined NewContact type
-            id: uuidv4(),
-            email: fromEmail,
-            fullName: fromName,
-            firstName: fromName.split(" ")[0] || "",
-            lastName: fromName.split(" ").slice(1).join(" ") || "",
-            organizationId: targetInbox.organizationId,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
 
-          const [newContact] = await db
-            .insert(contactSchema) // Use schema alias
-            .values(contactData)
-            .returning();
+        const currentPeriodContactCount = contactCountResult[0]?.value ?? 0; // Default to 0 if no result
 
-          contactRecord = newContact;
+        console.log(`Contacts created this period: ${currentPeriodContactCount}, Quota: ${subscriptionT.customerQuota}`);
+
+        // 2. Check against the customer quota for the current period
+        if (currentPeriodContactCount >= subscriptionT.customerQuota) {
+          console.warn(
+            `Customer quota exceeded for user: ${targetInbox.userId} (or org: ${targetInbox.organizationId}). Cannot create new contact.`
+          );
+          // Optionally, handle the quota exceeded case (e.g., send notification, block creation)
+          // For now, we'll just log and potentially skip creation or mark something
+          // Depending on requirements, you might return an error or just not create the contact.
+          // Let's skip creation for this example:
+          return NextResponse.json(
+            { error: "Customer quota for the current period exceeded" },
+            { status: 429 } // 429 Too Many Requests is appropriate for rate limiting/quota
+          );
         }
+
+        // 3. Create the new contact if quota is not exceeded
+        const contactData: NewContact = {
+          // Use defined NewContact type
+          id: uuidv4(),
+          email: fromEmail,
+          fullName: fromName,
+          firstName: fromName.split(" ")[0] || "",
+          lastName: fromName.split(" ").slice(1).join(" ") || "",
+          organizationId: targetInbox.organizationId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        const [newContact] = await db
+          .insert(contactSchema) // Use schema alias
+          .values(contactData)
+          .returning();
+
+        const [decrement] = await db
+          .update(subscription)
+          .set({ customerQuota: sql`${subscription.customerQuota} - 1` })
+          .where(eq(subscription.id, subscriptionT.id));
+
+        contactRecord = newContact;
       }
     }
 
     // Create a new ticket
-    const ticketData: NewTicket = { // Use defined NewTicket type
+    const ticketData: NewTicket = {
+      // Use defined NewTicket type
       id: uuidv4(),
       subject: subject,
       status: "UNASSIGNED",
@@ -243,24 +273,36 @@ async function handleInboundMail(data: ForwardEmailWebhook) {
       ticketData.organizationId = targetInbox.organizationId;
     }
 
-    const currentMonthStart = startOfMonth(new Date());
+    // For example : 2025-04-16 04:56:37.12
+    const subscriptionTimeLine = subscriptionT.createdAt;
 
+    // Add +1 month because its monthly.
+
+    // For example : 2025-05-16 04:56:37.12
+    const nextMonth = addMonths(subscriptionTimeLine, 1);
+
+    // Get the current month's ticket count
     const currentMonthTicketsResult = await db
       .select({ value: count() })
       .from(ticketSchema) // Use schema alias
       .where(
         and(
           eq(ticketSchema.creatorId, targetInbox.userId),
-          gte(ticketSchema.createdAt, currentMonthStart)
+          gte(ticketSchema.createdAt, subscriptionTimeLine),
+          lt(ticketSchema.createdAt, nextMonth)
         )
       );
 
+    // But what if ticket quota exceeded before this month finished? 
+    // For example ticket quota finished at : 2025-04-26 04:56:37.12
+    // We should avoid this by update subscription created at when user changed his subscription
+
+    // For example : 2
     const currentMonthTicketCount = currentMonthTicketsResult[0].value;
 
-    if (currentMonthTicketCount >= subscriptionT.ticketQuota) {
+    // Its exceeded the quota
+    if(currentMonthTicketCount >= subscriptionT.ticketQuota){
       ticketData.isOverQuota = true;
-    } else {
-      ticketData.isOverQuota = false;
     }
 
     // Insert the ticket into the database
@@ -268,6 +310,12 @@ async function handleInboundMail(data: ForwardEmailWebhook) {
       .insert(ticketSchema) // Use schema alias
       .values(ticketData)
       .returning();
+
+    // Decrement ticket quota after ticket creation
+    const [decrementQuota] = await db
+      .update(subscription)
+      .set({ ticketQuota: sql`${subscription.ticketQuota} - 1` })
+      .where(eq(subscription.userId, targetInbox.userId));
 
     // Log the creation
     console.log(

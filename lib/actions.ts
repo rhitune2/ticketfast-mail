@@ -219,55 +219,93 @@ export async function createSubscription(
   userId: string,
   type: "free" | "pro" | "enterprise"
 ): Promise<Subscription | null> {
-
   console.log({ userId, type });
-  console.log("Attempting to get current user.")
+  console.log("Attempting to get current user.");
+  
+  // 1. Get user
   const currentUser = await db.query.user.findFirst({
     where: eq(user.id, userId),
   });
-  console.log("Got current user query")
+  console.log("Got current user query");
 
   if (!currentUser) {
     console.log("User not found");
     return null;
   }
-  console.log({ currentUser })
 
-  const memberOrganization = await db.query.member.findFirst({
+  // 2. Get user's organization membership
+  const userMembership = await db.query.member.findFirst({
     where: eq(member.userId, userId),
   });
-  console.log({memberOrganization})
 
-  if(!memberOrganization){
-    console.log("Member organization not found.")
+  if (!userMembership) {
+    console.log("User has no organization membership");
     return null;
   }
 
-  const organizationId = memberOrganization.organizationId;
-  console.log({ organizationId })
-
-  if(!organizationId){
-    console.log("Not found organization ID")
-    return null;
-  }
-
-  const ownerOfOrganization = await db.query.organization.findFirst({
-    where: eq(organization.id, organizationId),
-  })
-  console.log({ ownerOfOrganization })
-
-  if(!ownerOfOrganization){
-    console.log("Owner of organization not found.")
-    return null;
-  }
-
-  const currentSubscription = await db.query.subscription.findFirst({
-    where: eq(subscription.userId, ownerOfOrganization.id),
+  // 3. Get organization details to find the owner
+  const organizationDetails = await db.query.organization.findFirst({
+    where: eq(organization.id, userMembership.organizationId),
   });
 
-  console.log({ currentSubscription })
-  console.log("Found current subscription. attemping to upgrade.")
-  
+  if (!organizationDetails) {
+    console.log("Organization not found");
+    return null;
+  }
 
-  return currentSubscription as Subscription | null;
+  // Find the organization owner (assuming owner has a specific role)
+  const organizationOwner = await db.query.member.findFirst({
+    where: and(
+      eq(member.organizationId, organizationDetails.id),
+      eq(member.role, "owner")
+    ),
+  });
+
+  if (!organizationOwner) {
+    console.log("Organization owner not found");
+    return null;
+  }
+
+  // 4. Get subscription by organization owner id
+  const currentSubscription = await db.query.subscription.findFirst({
+    where: eq(subscription.userId, organizationOwner.userId),
+  });
+
+  // 5. Create or update subscription
+  const now = new Date();
+  const subscriptionData = {
+    plan: type,
+    ticketQuota: SUBSCRIPTION_QUOTAS[type].ticketQuota,
+    customerQuota: SUBSCRIPTION_QUOTAS[type].customerQuota,
+    organizationQuota: SUBSCRIPTION_QUOTAS[type].organization.quota,
+    status: "ACTIVE",
+    updatedAt: now,
+    createdAt: now, // Update createdAt as requested
+  };
+
+  let result;
+
+  if (currentSubscription) {
+    // Update existing subscription
+    console.log("Updating existing subscription");
+    result = await db
+      .update(subscription)
+      .set(subscriptionData)
+      .where(eq(subscription.id, currentSubscription.id))
+      .returning();
+  } else {
+    // Create new subscription
+    console.log("Creating new subscription");
+    result = await db
+      .insert(subscription)
+      .values({
+        id: uuidv4(),
+        userId: organizationOwner.userId,
+        ...subscriptionData,
+      })
+      .returning();
+  }
+
+  console.log("Subscription operation completed", result[0]);
+  return result[0];
 }

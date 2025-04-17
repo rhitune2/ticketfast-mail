@@ -221,149 +221,159 @@ export async function createSubscription(
 ): Promise<Subscription | null> {
   console.log("Create Subscription triggered", { userId, type });
 
-  const currentUser = await db.query.user.findFirst({
-    where: eq(user.id, userId),
-  });
-
-  if (!currentUser) {
-    console.log("Current user not found");
-    return null;
-  }
-
-  console.log({ currentUser });
-
-  const currentMember = await db.query.member.findFirst({
-    where: eq(member.userId, userId),
-  });
-
-  console.log({ currentMember })
-
-  const userOrganization = await db.query.organization.findFirst({
-    where: eq(organization.id, currentMember?.organizationId!),
-  });
-
-  console.log({ userOrganization })
-
-  if (!userOrganization) {
-    console.log("User oragnization not found");
-    return null;
-  }
-
-  const baseSubscriptionData = {
-    plan: type,
-    customerQuota: SUBSCRIPTION_QUOTAS[type].customerQuota,
-    organizationQuota: SUBSCRIPTION_QUOTAS[type].organization.quota,
-    ticketQuota: SUBSCRIPTION_QUOTAS[type].ticketQuota,
-    status: "ACTIVE",
-  };
-
-  const updateValues = {
-    ...baseSubscriptionData,
-    updatedAt: new Date(),
-  };
-
-  const insertValues = {
-    id: uuidv4(),
-    userId: userId,
-    ...baseSubscriptionData,
-    createdAt: new Date(), // becasuse we creating a new subscription
-    updatedAt: new Date(),
-  };
-
-  console.log({ insertValues });
-
   try {
-    const result = await db
-      .insert(subscription)
-      .values(insertValues)
-      .onConflictDoUpdate({
-        target: subscription.userId, // Specify the conflict target column
-        set: updateValues,
-      })
-      .returning();
+    console.log("Trying to get user info");
+    const currentUser = await getUserInfo(userId);
 
-    console.log({ result });
+    if (!currentUser) {
+      console.log("Current user not found");
+      throw new Error("Current user not found");
+    }
+
+    console.log("Got user info", currentUser);
+
+    const currentMember = await db.query.member.findFirst({
+      where: eq(member.userId, userId),
+    });
+
+    if (!currentMember) {
+      throw new Error("Current member not found");
+    }
+
+    console.log("Got current member", currentMember);
+
+    const userOrganization = await db.query.organization.findFirst({
+      where: eq(organization.id, currentMember?.organizationId!),
+    });
+
+    console.log("Got user organization", userOrganization);
+
+    if (!userOrganization) {
+      console.log("User organization not found");
+      throw new Error("User organization not found");
+    }
+
+    const baseSubscriptionData = {
+      plan: type,
+      customerQuota: SUBSCRIPTION_QUOTAS[type].customerQuota,
+      organizationQuota: SUBSCRIPTION_QUOTAS[type].organization.quota,
+      ticketQuota: SUBSCRIPTION_QUOTAS[type].ticketQuota,
+      status: "ACTIVE",
+    };
+
+    const updateValues = {
+      ...baseSubscriptionData,
+      updatedAt: new Date(),
+    };
+
+    const insertValues = {
+      id: uuidv4(),
+      userId: userId,
+      ...baseSubscriptionData,
+      createdAt: new Date(), // becasuse we creating a new subscription
+      updatedAt: new Date(),
+    };
+
+    console.log({ insertValues });
 
     try {
-      const lockedTickets = await db
-        .select()
-        .from(ticket)
-        .where(
-          and(
-            eq(ticket.organizationId, userOrganization.id!),
-            eq(ticket.isOverQuota, true)
-          )
-        );
+      const result = await db
+        .insert(subscription)
+        .values(insertValues)
+        .onConflictDoUpdate({
+          target: subscription.userId, // Specify the conflict target column
+          set: updateValues,
+        })
+        .returning();
 
-      if (lockedTickets && lockedTickets.length > 0) {
-        await db
-          .update(ticket)
-          .set({ isOverQuota: false })
+      console.log({ result });
+
+      try {
+        const lockedTickets = await db
+          .select()
+          .from(ticket)
           .where(
             and(
               eq(ticket.organizationId, userOrganization.id!),
               eq(ticket.isOverQuota, true)
             )
           );
+
+        if (lockedTickets && lockedTickets.length > 0) {
+          await db
+            .update(ticket)
+            .set({ isOverQuota: false })
+            .where(
+              and(
+                eq(ticket.organizationId, userOrganization.id!),
+                eq(ticket.isOverQuota, true)
+              )
+            );
+        }
+
+        // Check if result exists and has data before accessing ticketQuota
+        if (
+          result &&
+          result.length > 0 &&
+          lockedTickets.length >= result[0].ticketQuota
+        ) {
+          console.log(
+            `User ${userId} exceeded ticket quota. Locked tickets: ${lockedTickets.length}, Quota: ${result[0].ticketQuota}`
+          );
+          await db
+            .insert(log)
+            .values({
+              id: uuidv4(),
+              title: "Ticket Quota Exceeded",
+              description: `User ${userId} has exceeded their ticket quota.`,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .returning();
+        } else {
+          // Check if result exists and has data before decrementing
+          if (result && result.length > 0) {
+            console.log(
+              `Decrementing subscription quota. Locked tickets: ${lockedTickets.length}`
+            );
+            const [decrement] = await db
+              .update(subscription)
+              .set({
+                customerQuota: sql`${subscription.customerQuota} - ${lockedTickets.length}`,
+              })
+              .where(eq(subscription.id, result[0].id));
+            console.log("Decrement result:", decrement); // Log decrement result if needed
+          } else {
+            console.log(
+              "Skipping quota decrement because subscription result is missing."
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Error decrementing customer quota:", error);
+        return null;
       }
 
-      // Check if result exists and has data before accessing ticketQuota
-      if (
-        result &&
-        result.length > 0 &&
-        lockedTickets.length >= result[0].ticketQuota
-      ) {
+      if (result && result.length > 0) {
         console.log(
-          `User ${userId} exceeded ticket quota. Locked tickets: ${lockedTickets.length}, Quota: ${result[0].ticketQuota}`
+          "Subscription upsert successful for user",
+          userId,
+          "Result:",
+          result[0]
         );
-        await db
-          .insert(log)
-          .values({
-            id: uuidv4(),
-            title: "Ticket Quota Exceeded",
-            description: `User ${userId} has exceeded their ticket quota.`,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .returning();
+        return result[0] as Subscription;
       } else {
-        // Check if result exists and has data before decrementing
-        if (result && result.length > 0) {
-          console.log(
-            `Decrementing subscription quota. Locked tickets: ${lockedTickets.length}`
-          );
-          const [decrement] = await db
-            .update(subscription)
-            .set({
-              customerQuota: sql`${subscription.customerQuota} - ${lockedTickets.length}`,
-            })
-            .where(eq(subscription.id, result[0].id));
-          console.log("Decrement result:", decrement); // Log decrement result if needed
-        } else {
-          console.log(
-            "Skipping quota decrement because subscription result is missing."
-          );
-        }
+        console.error(
+          `Subscription upsert for user ${userId} returned no data.`
+        );
+        return null;
       }
     } catch (error) {
-      console.error("Error decrementing customer quota:", error);
+      console.error(`Error upserting subscription for user ${userId}:`, error);
       return null;
     }
-
-    if (result && result.length > 0) {
-      console.log(
-        "Subscription upsert successful for user",
-        userId,
-        "Result:",
-        result[0]
-      );
-      return result[0] as Subscription;
-    } else {
-      console.error(`Subscription upsert for user ${userId} returned no data.`);
-      return null;
-    }
-  } catch (error) {
-    console.error(`Error upserting subscription for user ${userId}:`, error);
+  } catch (err) {
+    console.error("Error creating subscription:", err);
     return null;
   }
 }

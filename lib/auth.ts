@@ -35,8 +35,8 @@ import { createAuthMiddleware } from "better-auth/api";
 // });
 
 const client = new Polar({
-  accessToken: process.env.POLAR_ACCESS_TOKEN_SANDBOX,
-  server: "sandbox",
+  accessToken: process.env.POLAR_ACCESS_TOKEN,
+  server: "production",
 });
 
 export const auth = betterAuth({
@@ -248,31 +248,30 @@ export const auth = betterAuth({
             slug: "free",
           },
           {
-            productId:"d73591b0-ed35-40ea-97dd-378f548754c0",
+            productId: "069a9886-ebdd-45c2-b540-a4d61b2281c8",
             slug: "pro",
           },
           {
-            productId:
-              process.env.NODE_ENV === "development"
-                ? "d73591b0-ed35-40ea-97dd-378f548754c0"
-                : "f89a631f-0df1-4a40-95f8-e9661a4bbf13",
+            productId: "f89a631f-0df1-4a40-95f8-e9661a4bbf13",
             slug: "enterprise",
           },
         ],
         successUrl: "/success?checkout_id={CHECKOUT_ID}",
       },
       webhooks: {
-        secret: process.env.POLAR_WEBHOOK_SECRET_SANDBOX!,
-        // process.env.NODE_ENV === "development"
-        //   ? process.env.POLAR_WEBHOOK_SECRET_SANDBOX!
-        //   : process.env.POLAR_WEBHOOK_SECRET!,
-        onPayload : async(payload ) => {
-          if(payload.type === "subscription.created"){
+        secret: process.env.POLAR_WEBHOOK_SECRET!,
+        onPayload: async (payload) => {
+          if (
+            payload.type === "subscription.created" ||
+            payload.type === "subscription.updated"
+          ) {
             const externalId = payload.data.customer.externalId;
             await createSubscription(
               externalId!,
               payload.data.product.name as "free" | "pro" | "enterprise"
             );
+          } else if (payload.type === "subscription.canceled") {
+            await createSubscription(payload.data.customer.externalId!, "free");
           }
         },
       },

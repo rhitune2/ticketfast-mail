@@ -266,25 +266,15 @@ export const auth = betterAuth({
         // process.env.NODE_ENV === "development"
         //   ? process.env.POLAR_WEBHOOK_SECRET_SANDBOX!
         //   : process.env.POLAR_WEBHOOK_SECRET!,
-        onSubscriptionCreated: async (payload) => {
-          const externalId = payload.data.customer.externalId;
-          await createSubscription(
-            externalId!,
-            payload.data.product.name as "free" | "pro" | "enterprise"
-          );
+        onPayload : async(payload ) => {
+          if(payload.type === "subscription.created"){
+            const externalId = payload.data.customer.externalId;
+            await createSubscription(
+              externalId!,
+              payload.data.product.name as "free" | "pro" | "enterprise"
+            );
+          }
         },
-        // onSubscriptionUpdated: async (payload) => {
-        //   const data = payload.data;
-        //   await createSubscription(
-        //     data,
-        //     data.product.name as "free" | "pro" | "enterprise"
-        //   );
-        // },
-        // onSubscriptionCanceled: async (payload) => {
-        //   const data = payload.data;
-        //   // we downgrading user's subscription to free
-        //   await createSubscription(data.user.email, "free");
-        // },
       },
     }),
   ],

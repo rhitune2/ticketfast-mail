@@ -219,18 +219,33 @@ export async function createSubscription(
   userId: string,
   type: "free" | "pro" | "enterprise"
 ): Promise<Subscription | null> {
-  
-  console.log("Create Subscription triggered" , { userId, type })
+  console.log("Create Subscription triggered", { userId, type });
 
-  const currentUser = await db.query.user.findFirst({ where :eq(user.id, userId)})
+  const currentUser = await db.query.user.findFirst({
+    where: eq(user.id, userId),
+  });
 
-  if(!currentUser){
+  if (!currentUser) {
+    console.log("Current user not found");
     return null;
   }
 
-  const userOrganization = await db.query.member.findFirst({ where :eq(member.userId, userId)})
+  console.log({ currentUser });
 
-  if(!userOrganization){
+  const currentMember = await db.query.member.findFirst({
+    where: eq(member.userId, userId),
+  });
+
+  console.log({ currentMember })
+
+  const userOrganization = await db.query.organization.findFirst({
+    where: eq(organization.id, currentMember?.organizationId!),
+  });
+
+  console.log({ userOrganization })
+
+  if (!userOrganization) {
+    console.log("User oragnization not found");
     return null;
   }
 
@@ -255,7 +270,7 @@ export async function createSubscription(
     updatedAt: new Date(),
   };
 
-  console.log({ insertValues })
+  console.log({ insertValues });
 
   try {
     const result = await db
@@ -267,7 +282,7 @@ export async function createSubscription(
       })
       .returning();
 
-      console.log({ result })
+    console.log({ result });
 
     try {
       const lockedTickets = await db
@@ -275,7 +290,7 @@ export async function createSubscription(
         .from(ticket)
         .where(
           and(
-            eq(ticket.organizationId, userOrganization.organizationId),
+            eq(ticket.organizationId, userOrganization.id!),
             eq(ticket.isOverQuota, true)
           )
         );
@@ -286,15 +301,21 @@ export async function createSubscription(
           .set({ isOverQuota: false })
           .where(
             and(
-              eq(ticket.organizationId, userOrganization.organizationId),
+              eq(ticket.organizationId, userOrganization.id!),
               eq(ticket.isOverQuota, true)
             )
           );
       }
 
       // Check if result exists and has data before accessing ticketQuota
-      if (result && result.length > 0 && lockedTickets.length >= result[0].ticketQuota) {
-        console.log(`User ${userId} exceeded ticket quota. Locked tickets: ${lockedTickets.length}, Quota: ${result[0].ticketQuota}`);
+      if (
+        result &&
+        result.length > 0 &&
+        lockedTickets.length >= result[0].ticketQuota
+      ) {
+        console.log(
+          `User ${userId} exceeded ticket quota. Locked tickets: ${lockedTickets.length}, Quota: ${result[0].ticketQuota}`
+        );
         await db
           .insert(log)
           .values({
@@ -308,7 +329,9 @@ export async function createSubscription(
       } else {
         // Check if result exists and has data before decrementing
         if (result && result.length > 0) {
-          console.log(`Decrementing subscription quota. Locked tickets: ${lockedTickets.length}`);
+          console.log(
+            `Decrementing subscription quota. Locked tickets: ${lockedTickets.length}`
+          );
           const [decrement] = await db
             .update(subscription)
             .set({
@@ -317,7 +340,9 @@ export async function createSubscription(
             .where(eq(subscription.id, result[0].id));
           console.log("Decrement result:", decrement); // Log decrement result if needed
         } else {
-          console.log("Skipping quota decrement because subscription result is missing.");
+          console.log(
+            "Skipping quota decrement because subscription result is missing."
+          );
         }
       }
     } catch (error) {
@@ -326,7 +351,12 @@ export async function createSubscription(
     }
 
     if (result && result.length > 0) {
-      console.log("Subscription upsert successful for user", userId, "Result:", result[0]);
+      console.log(
+        "Subscription upsert successful for user",
+        userId,
+        "Result:",
+        result[0]
+      );
       return result[0] as Subscription;
     } else {
       console.error(`Subscription upsert for user ${userId} returned no data.`);

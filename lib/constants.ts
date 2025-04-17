@@ -1,4 +1,4 @@
-export type SubscriptionPlan = 'FREE' | 'PRO' | 'ENTERPRISE';
+export type SubscriptionPlan = 'free' | 'pro' | 'enterprise';
 
 export interface OrganizationQuota {
   quota: number;
@@ -12,7 +12,7 @@ export interface SubscriptionQuota {
 }
 
 export const SUBSCRIPTION_QUOTAS: Record<SubscriptionPlan, SubscriptionQuota> = {
-  FREE: {
+  free: {
     ticketQuota: 100,
     customerQuota: 10,
     organization: {
@@ -20,7 +20,7 @@ export const SUBSCRIPTION_QUOTAS: Record<SubscriptionPlan, SubscriptionQuota> = 
       memberQuota: 3,
     },
   },
-  PRO: {
+  pro: {
     ticketQuota: 500,
     customerQuota: 50,
     organization: {
@@ -28,7 +28,7 @@ export const SUBSCRIPTION_QUOTAS: Record<SubscriptionPlan, SubscriptionQuota> = 
       memberQuota: 10,
     },
   },
-  ENTERPRISE: {
+  enterprise: {
     ticketQuota: 2000,
     customerQuota: 200,
     organization: {
@@ -37,3 +37,16 @@ export const SUBSCRIPTION_QUOTAS: Record<SubscriptionPlan, SubscriptionQuota> = 
     },
   },
 };
+
+/**
+ * Tags for ticket categorization and management
+ */
+export const TAGS : string[] = [
+  "SPAM",       // Unwanted messages
+  "JOB",        // Employment-related tickets
+  "FEEDBACK",   // User feedback
+  "BUG",        // Issue reports
+  "BILLING",    // Payment-related issues
+  "URGENT",     // Time-sensitive matters
+  "SUPPORT",
+];

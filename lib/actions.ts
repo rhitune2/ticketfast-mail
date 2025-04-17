@@ -1,13 +1,31 @@
 import { db } from "@/db";
-import { eq } from "drizzle-orm";
-import { inbox, subscription, user, member, organization } from "@/db-schema";
+import { and, eq, sql } from "drizzle-orm";
+import {
+  inbox,
+  user,
+  member,
+  organization,
+  subscription,
+  ticket,
+  log,
+} from "@/db-schema";
 import { auth } from "./auth";
 import { headers } from "next/headers";
 import type { Inbox, Organization, Subscription, User } from "@/db";
 import { SUBSCRIPTION_QUOTAS } from "@/lib/constants";
 import { v4 as uuidv4 } from "uuid";
 import slugify from "slugify";
+import { Polar } from "@polar-sh/sdk";
 
+/**
+ * Retrieves the active organization for the given user ID.
+ *
+ * @param userId - The ID of the user whose active organization is to be fetched.
+ * @returns A Promise that resolves to the active Organization object if found, or null if no active organization is associated with the user.
+ *
+ * This function accesses the database to find the user's membership and then queries for the organization details.
+ * Handles errors and logs them to the console.
+ */
 export async function getActiveOrganization(
   userId: string
 ): Promise<Organization | null> {
@@ -74,15 +92,21 @@ export async function createFreeSubscription(
 
   if (!currentUser) return null;
 
+  const isInvited = await db.query.member.findFirst({
+    where: eq(member.userId, userId),
+  });
+
+  if (isInvited) return null;
+
   const insertSubscription = await db
     .insert(subscription)
     .values({
       id: uuidv4(),
       userId,
-      plan: "FREE",
-      customerQuota: SUBSCRIPTION_QUOTAS.FREE.customerQuota,
-      organizationQuota: SUBSCRIPTION_QUOTAS.FREE.organization.quota,
-      ticketQuota: SUBSCRIPTION_QUOTAS.FREE.ticketQuota,
+      plan: "free",
+      customerQuota: SUBSCRIPTION_QUOTAS.free.customerQuota,
+      organizationQuota: SUBSCRIPTION_QUOTAS.free.organization.quota,
+      ticketQuota: SUBSCRIPTION_QUOTAS.free.ticketQuota,
       status: "ACTIVE",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -178,4 +202,136 @@ export async function getOrganizationSubscription({
   });
 
   return currentSubscription as Subscription | null;
+}
+
+export async function createSubscription(
+  payload: any,
+  type: "free" | "pro" | "enterprise"
+): Promise<Subscription | null> {
+  const client = new Polar({
+    accessToken:
+      process.env.NODE_ENV === "development"
+        ? process.env.POLAR_ACCESS_TOKEN_SANDBOX
+        : process.env.POLAR_ACCESS_TOKEN,
+    server: process.env.NODE_ENV === "development" ? "sandbox" : "production",
+  });
+
+  const customer = await client.customers.get({
+    id: payload.customer.id,
+  });
+
+  const currentUser = await db.query.user.findFirst({
+    where: eq(user.email, customer.email),
+  });
+
+  if (!currentUser) {
+    return null;
+  }
+
+  const userOrganization = await db.query.member.findFirst({
+    where: eq(member.userId, currentUser.id),
+  });
+
+  // We need to ensure we have a valid userId
+  if (!userOrganization || !userOrganization.userId) {
+    console.error(
+      `No organization membership found for user: ${currentUser.email}`
+    );
+    return null;
+  }
+
+  // userId is now guaranteed to be defined
+  const userId = userOrganization.userId;
+
+  const baseSubscriptionData = {
+    plan: type,
+    customerQuota: SUBSCRIPTION_QUOTAS[type].customerQuota,
+    organizationQuota: SUBSCRIPTION_QUOTAS[type].organization.quota,
+    ticketQuota: SUBSCRIPTION_QUOTAS[type].ticketQuota,
+    status: "ACTIVE",
+  };
+
+  const updateValues = {
+    ...baseSubscriptionData,
+    updatedAt: new Date(),
+  };
+
+  const insertValues = {
+    id: uuidv4(),
+    userId: userId,
+    ...baseSubscriptionData,
+    createdAt: new Date(), // becasuse we creating a new subscription
+    updatedAt: new Date(),
+  };
+
+  try {
+    const result = await db
+      .insert(subscription)
+      .values(insertValues)
+      .onConflictDoUpdate({
+        target: subscription.userId,
+        set: updateValues,
+      })
+      .returning();
+
+    try {
+      const lockedTickets = await db
+        .select()
+        .from(ticket)
+        .where(
+          and(
+            eq(ticket.organizationId, userOrganization.organizationId),
+            eq(ticket.isOverQuota, true)
+          )
+        );
+
+      if (lockedTickets && lockedTickets.length > 0) {
+        await db
+          .update(ticket)
+          .set({ isOverQuota: false })
+          .where(
+            and(
+              eq(ticket.organizationId, userOrganization.organizationId),
+              eq(ticket.isOverQuota, true)
+            )
+          );
+      }
+
+      if (lockedTickets.length >= result[0].ticketQuota) {
+
+        // Send mail
+
+        await db
+          .insert(log)
+          .values({
+            id: uuidv4(),
+            title: "Ticket Quota Exceeded",
+            description: `User ${userId} has exceeded their ticket quota.`,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+      } else {
+        const [decrement] = await db
+          .update(subscription)
+          .set({
+            customerQuota: sql`${subscription.customerQuota} - ${lockedTickets.length}`,
+          })
+          .where(eq(subscription.id, result[0].id));
+      }
+    } catch (error) {
+      console.error("Error decrementing customer quota:", error);
+      return null;
+    }
+
+    if (result && result.length > 0) {
+      return result[0] as Subscription;
+    } else {
+      console.error(`Subscription upsert for user ${userId} returned no data.`);
+      return null;
+    }
+  } catch (error) {
+    console.error(`Error upserting subscription for user ${userId}:`, error);
+    return null;
+  }
 }

@@ -86,10 +86,6 @@ export async function POST(request: NextRequest) {
       // Start a transaction to ensure data consistency
       await db.transaction(async (tx) => {
         // Always update the user's isUsingSmtp flag
-        await tx
-          .update(user)
-          .set({ isUsingSmtp: parsedData.isUsingSmtp })
-          .where(eq(user.id, userId));
 
         // If SMTP is enabled, use upsert to insert or update SMTP settings
         if (parsedData.isUsingSmtp) {
@@ -101,6 +97,7 @@ export async function POST(request: NextRequest) {
             secure: parsedData.smtpSecure,
             fromEmail: parsedData.fromEmail || "",
             fromName: parsedData.fromName || "",
+            isUsingSmtp:parsedData.isUsingSmtp,
             updatedAt: new Date()
           };
           

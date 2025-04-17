@@ -94,15 +94,15 @@ export function AppSidebar({
       items: [
         {
           title: "All Tickets",
-          url: "/inbox",
+          url: "/inbox?filter=all",
         },
         {
           title: "My Tickets",
-          url: "/inbox/my",
+          url: "/inbox?filter=mine",
         },
         {
           title: "Unassigned",
-          url: "/inbox/unassigned",
+          url: "/inbox?filter=unassigned",
         },
       ],
     },
@@ -110,41 +110,17 @@ export function AppSidebar({
       title: "Templates",
       url: "/templates",
       icon: LayoutTemplate,
-      items: [
-        {
-          title: "Response Templates",
-          url: "/templates/responses",
-        },
-        {
-          title: "Email Templates",
-          url: "/templates/emails",
-        },
-        {
-          title: "Ticket Templates",
-          url: "/templates/tickets",
-        },
-      ],
     },
     {
       title: "Team",
-      url: "/team",
+      url: "/settings?tab=team",
       icon: Users,
       items: [
         {
           title: "Members",
-          url: "/team/members",
-        },
-        {
-          title: "Roles",
-          url: "/team/roles",
-        },
+          url: "/settings?tab=team",
+        },  
       ],
-    },
-    {
-      title: "Labels",
-      url: "/labels",
-      icon: Tag,
-      items: [],
     },
     {
       title: "Settings",
@@ -152,21 +128,14 @@ export function AppSidebar({
       icon: Settings,
       items: [
         {
-          title: "General",
-          url: "/settings/general",
+          title: "Billing",
+          url: "/settings?tab=billing",
         },
         {
           title: "Team",
-          url: "/settings/team",
+          url: "/settings?tab=team",
         },
-        {
-          title: "Billing",
-          url: "/settings/billing",
-        },
-        {
-          title: "API",
-          url: "/settings/api",
-        },
+       
       ],
     },
   ];

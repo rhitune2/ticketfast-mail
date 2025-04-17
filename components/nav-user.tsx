@@ -42,6 +42,10 @@ export function NavUser({
   const { isMobile } = useSidebar();
   const router = useRouter();
 
+  const handleRouteChange = (path : string) => {
+    return router.push(path)
+  }
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -90,24 +94,20 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => { handleRouteChange("/settings/?tab=billing") }}>
                 <Sparkles />
                 Upgrade to Pro
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => { handleRouteChange("/settings/?tab=account") }}>
                 <BadgeCheck />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => { handleRouteChange("/settings/?tab=billing") }}>
                 <CreditCard />
                 Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Bell />
-                Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
@@ -116,7 +116,7 @@ export function NavUser({
                 await authClient.signOut({
                   fetchOptions: {
                     onSuccess:() => {
-                      router.push("/")
+                      handleRouteChange("/")
                     }
                   },
                 });

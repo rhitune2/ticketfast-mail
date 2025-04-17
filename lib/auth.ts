@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db, invitation, member, subscription, user } from "@/db";
+import { db, inbox, invitation, member, subscription, user } from "@/db";
 import { organization } from "better-auth/plugins/organization";
 import { polar } from "@polar-sh/better-auth";
 import { Polar } from "@polar-sh/sdk";
@@ -11,6 +11,7 @@ import {
   getActiveOrganization,
   getUserInfo,
   getOrganizationCount,
+  createSubscription,
 } from "@/lib/actions";
 import { headers } from "next/headers";
 import { SUBSCRIPTION_QUOTAS } from "@/lib/constants";
@@ -29,6 +30,10 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
   }),
+  rateLimit: {
+    window: 10,
+    max: 100,
+  },
   trustedOrigins: ["http://localhost:3000", "https://ticketfa.st"],
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
@@ -52,12 +57,6 @@ export const auth = betterAuth({
         type: "boolean",
         defaultValue: false,
       },
-    },
-  },
-  session: {
-    cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60, // Cache duration in seconds
     },
   },
   emailAndPassword: {
@@ -85,20 +84,14 @@ export const auth = betterAuth({
       create: {
         before: async (session) => {
           try {
-            const user = await getUserInfo(session.userId);
-            if (user?.isCompletedOnboarding) {
-              const organization = await getActiveOrganization(session.userId);
-              return {
-                data: {
-                  ...session,
-                  activeOrganizationId: organization?.id,
-                },
-              };
-            } else {
-              return {
-                data: session,
-              };
-            }
+            const organization = await getActiveOrganization(session.userId);
+
+            return {
+              data: {
+                ...session,
+                activeOrganizationId: organization?.id,
+              },
+            };
           } catch (error) {
             return {
               data: session,
@@ -119,6 +112,7 @@ export const auth = betterAuth({
       },
       update: {
         after: async (currentUser) => {
+          console.log("UPDATE COMING ", currentUser);
           // check if user is invited by
           const isInvited = await db.query.invitation.findFirst({
             where: eq(invitation.email, currentUser.email),
@@ -127,10 +121,10 @@ export const auth = betterAuth({
           // we dont create inbox because he is invited.
           if (isInvited) return;
 
-          const userOrganization = await auth.api.getFullOrganization({
-            headers: await headers(),
-          });
+          console.log("GETTİNG ORG");
+          const userOrganization = await getActiveOrganization(currentUser.id);
 
+          console.log("USER ORG ", userOrganization);
           // we should set activeorganization id for session
 
           await auth.api.setActiveOrganization({
@@ -140,6 +134,7 @@ export const auth = betterAuth({
             headers: await headers(),
           });
 
+          console.log("SETTED ORG");
           await createDefaultInbox(currentUser.id);
 
           if (!userOrganization) {
@@ -172,18 +167,18 @@ export const auth = betterAuth({
           });
 
           switch (userSubscription?.plan) {
-            case "FREE":
-              return SUBSCRIPTION_QUOTAS.FREE.organization.memberQuota;
-            case "PRO":
-              return SUBSCRIPTION_QUOTAS.PRO.organization.memberQuota;
-            case "ENTERPRISE":
-              return SUBSCRIPTION_QUOTAS.ENTERPRISE.organization.memberQuota;
+            case "free":
+              return SUBSCRIPTION_QUOTAS.free.organization.memberQuota;
+            case "pro":
+              return SUBSCRIPTION_QUOTAS.pro.organization.memberQuota;
+            case "enterprise":
+              return SUBSCRIPTION_QUOTAS.enterprise.organization.memberQuota;
             default:
-              return SUBSCRIPTION_QUOTAS.FREE.organization.memberQuota;
+              return SUBSCRIPTION_QUOTAS.free.organization.memberQuota;
           }
         } catch (error) {
           console.error("Error checking invitation limit:", error);
-          return SUBSCRIPTION_QUOTAS.FREE.organization.memberQuota;
+          return SUBSCRIPTION_QUOTAS.free.organization.memberQuota;
         }
       },
       async organizationLimit(user) {
@@ -193,14 +188,14 @@ export const auth = betterAuth({
 
         const userOrganizationCount = await getOrganizationCount(user.id);
 
-        let maxOrganizations = SUBSCRIPTION_QUOTAS.FREE.organization.quota;
+        let maxOrganizations = SUBSCRIPTION_QUOTAS.free.organization.quota;
         switch (userSubscription?.plan) {
-          case "PRO":
-            maxOrganizations = SUBSCRIPTION_QUOTAS.PRO.organization.quota;
+          case "pro":
+            maxOrganizations = SUBSCRIPTION_QUOTAS.pro.organization.quota;
             break;
-          case "ENTERPRISE":
+          case "enterprise":
             maxOrganizations =
-              SUBSCRIPTION_QUOTAS.ENTERPRISE.organization.quota;
+              SUBSCRIPTION_QUOTAS.enterprise.organization.quota;
             break;
         }
 
@@ -257,8 +252,23 @@ export const auth = betterAuth({
         //   ? process.env.POLAR_WEBHOOK_SECRET_SANDBOX!
         //   : process.env.POLAR_WEBHOOK_SECRET!,
         onSubscriptionCreated: async (payload) => {
-          console.log("Subscription created:", payload);
-          console.log(payload.data);
+          const data = payload.data;
+          await createSubscription(
+            data,
+            data.product.name as "free" | "pro" | "enterprise"
+          );
+        },
+        onSubscriptionUpdated: async (payload) => {
+          const data = payload.data;
+          await createSubscription(
+            data,
+            data.product.name as "free" | "pro" | "enterprise"
+          );
+        },
+        onSubscriptionCanceled: async (payload) => {
+          const data = payload.data;
+          // we downgrading user's subscription to free
+          await createSubscription(data.user.email, "free");
         },
       },
     }),

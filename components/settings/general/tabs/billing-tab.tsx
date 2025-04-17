@@ -25,9 +25,10 @@ import { toast } from "sonner";
 
 interface BillingTabProps {
   subscription: Subscription | null;
+  isOwner: boolean;
 }
 
-export function BillingTab({ subscription }: BillingTabProps) {
+export function BillingTab({ subscription, isOwner }: BillingTabProps) {
   const router = useRouter();
 
   const handlePlanSelect = (plan: SubscriptionPlan) => {
@@ -61,10 +62,20 @@ export function BillingTab({ subscription }: BillingTabProps) {
                 {subscription.status}
               </p>
             </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Limits</p>
+              <p className="text-sm text-muted-foreground capitalize">
+                Customer Quota : {subscription.customerQuota}/{SUBSCRIPTION_QUOTAS[subscription.plan as SubscriptionPlan || "free"].customerQuota}
+                <br />
+                Ticket Quota : {subscription.ticketQuota}/{SUBSCRIPTION_QUOTAS[subscription.plan as SubscriptionPlan || "free"].ticketQuota}
+              </p>
+            </div>
             <Separator />
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="outline">Manage Subscription</Button>
+                <Button variant="outline" disabled={!isOwner}>
+                  Manage Subscription
+                </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>

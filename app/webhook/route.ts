@@ -11,6 +11,7 @@ import {
   subscription,
   contact,
 } from "@/db";
+import { categorizeEmail } from "@/lib/ai/categorize-email";
 import {
   eq,
   and,
@@ -214,10 +215,9 @@ async function handleInboundMail(data: ForwardEmailWebhook) {
           console.warn(
             `Customer quota exceeded for user: ${targetInbox.userId} (or org: ${targetInbox.organizationId}). Cannot create new contact.`
           );
-          // Optionally, handle the quota exceeded case (e.g., send notification, block creation)
-          // For now, we'll just log and potentially skip creation or mark something
-          // Depending on requirements, you might return an error or just not create the contact.
-          // Let's skip creation for this example:
+
+          // Send mail
+          
           return NextResponse.json(
             { error: "Customer quota for the current period exceeded" },
             { status: 429 } // 429 Too Many Requests is appropriate for rate limiting/quota
@@ -251,13 +251,40 @@ async function handleInboundMail(data: ForwardEmailWebhook) {
       }
     }
 
-    // Create a new ticket
+    // Analyze the email content to categorize the ticket using AI
+    console.log("Analyzing email content for ticket categorization...");
+    let ticketStatus = "UNASSIGNED";
+    let ticketPriority = "NORMAL";
+    let ticketTag = null;
+
+    try {
+      const categorization = await categorizeEmail({
+        emailContent: textContent || "",
+        subject: subject,
+        fromName: fromName,
+        fromEmail: fromEmail
+      });
+
+      // Use the AI-determined values
+      ticketStatus = categorization.status;
+      ticketPriority = categorization.priority;
+      ticketTag = categorization.tag;
+
+      console.log(`AI Categorization result - Status: ${ticketStatus}, Priority: ${ticketPriority}, Tag: ${ticketTag || 'None'}, Confidence: ${categorization.analysis.confidence}`);
+      console.log(`Reasoning: ${categorization.analysis.reasoning}`);
+    } catch (error) {
+      console.error("Error during ticket categorization:", error);
+      // Continue with default values if categorization fails
+    }
+
+    // Create a new ticket with AI-determined values
     const ticketData: NewTicket = {
       // Use defined NewTicket type
       id: uuidv4(),
       subject: subject,
-      status: "UNASSIGNED",
-      priority: "NORMAL",
+      status: ticketStatus,
+      priority: ticketPriority,
+      tag: ticketTag,
       fromEmail: fromEmail,
       fromName: fromName,
       toEmail: toEmail,

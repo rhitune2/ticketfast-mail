@@ -39,6 +39,8 @@ export default async function OnboardingPage() {
     metadata: fullOrganization.metadata
   } : null;
 
+  console.log({ session })
+
   return (
     <OnboardingWizard user={activeUser} organization={activeOrganization} />
   );

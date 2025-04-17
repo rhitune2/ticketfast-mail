@@ -6,7 +6,7 @@ import {
   boolean,
 } from "drizzle-orm/pg-core";
 import { SUBSCRIPTION_QUOTAS } from "./lib/constants";
-import { relations } from 'drizzle-orm';
+import { relations } from "drizzle-orm";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -24,7 +24,6 @@ export const user = pgTable("user", {
   companySize: text("company_size"),
   communicationType: text("communication_type"),
 
-  isUsingSmtp: boolean("is_using_smtp").notNull().default(false),
   isCompletedOnboarding: boolean("is_completed_onboarding").default(false),
 
   createdAt: timestamp("created_at").notNull(),
@@ -35,7 +34,7 @@ export const subscription = pgTable("subscriptions", {
   id: text("id").primaryKey(),
 
   // Free , Pro , Enterprise
-  plan: text("plan").notNull().default("FREE"),
+  plan: text("plan").notNull().default("free"),
 
   // ACTIVE
   status: text("status").notNull().default("ACTIVE"),
@@ -43,17 +42,17 @@ export const subscription = pgTable("subscriptions", {
   // default 100
   ticketQuota: integer("ticket_quota")
     .notNull()
-    .default(SUBSCRIPTION_QUOTAS.FREE.ticketQuota),
+    .default(SUBSCRIPTION_QUOTAS.free.ticketQuota),
 
   // default 10
   customerQuota: integer("customer_quota")
     .notNull()
-    .default(SUBSCRIPTION_QUOTAS.FREE.customerQuota),
+    .default(SUBSCRIPTION_QUOTAS.free.customerQuota),
 
   // default 3
   organizationQuota: integer("organization_quota")
     .notNull()
-    .default(SUBSCRIPTION_QUOTAS.FREE.organization.quota),
+    .default(SUBSCRIPTION_QUOTAS.free.organization.quota),
 
   userId: text("user_id")
     .notNull()
@@ -192,9 +191,13 @@ export const smtpSettings = pgTable("smtp_settings", {
   organizationId: text("organization_id").references(() => organization.id, {
     onDelete: "cascade",
   }),
+  isUsingSmtp: boolean("is_using_smtp").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull(),
 });
+
+// Export the inferred type
+export type SmtpSettings = typeof smtpSettings.$inferSelect;
 
 export const ticket = pgTable("ticket", {
   id: text("id").primaryKey(),
@@ -206,6 +209,9 @@ export const ticket = pgTable("ticket", {
 
   // LOW NORMAL MEDIUM HIGH
   priority: text("priority").default("NORMAL").notNull(),
+
+  // SPAM, JOB, FEEDBACK, BUG, BILLING, URGENT, SUPPORT
+  tag: text("tag"),
 
   fromEmail: text("from_email"),
   fromName: text("from_name"),
@@ -259,18 +265,18 @@ export const ticketMessage = pgTable("ticket_message", {
   id: text("id").primaryKey(),
   content: text("content").notNull(), // HTML or text content of the email
   contentType: text("content_type").notNull().default("text/html"), // Content type (html or plain text)
-  
+
   // Metadata
   fromName: text("from_name"),
   fromEmail: text("from_email"),
   isInternal: boolean("is_internal").notNull().default(false),
   isAgent: boolean("is_agent").notNull().default(false),
-  
+
   // Foreign key to ticket
   ticketId: text("ticket_id")
     .notNull()
     .references(() => ticket.id, { onDelete: "cascade" }),
-  
+
   // Timestamps
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -279,23 +285,24 @@ export const ticketMessage = pgTable("ticket_message", {
 // Attachments table for storing email attachments
 export const ticketAttachment = pgTable("ticket_attachment", {
   id: text("id").primaryKey(),
-  
+
   // Attachment data
   filename: text("filename").notNull(),
   contentType: text("content_type").notNull(),
   size: integer("size").notNull(),
   checksum: text("checksum"),
-  
+
   // Blob data - Store the actual attachment content directly in the database
-  blobData: text("blob_data"),  // Base64 encoded attachment data
-  
+  blobData: text("blob_data"), // Base64 encoded attachment data
+
   // Foreign keys
   ticketId: text("ticket_id")
     .notNull()
     .references(() => ticket.id, { onDelete: "cascade" }),
-  messageId: text("message_id")
-    .references(() => ticketMessage.id, { onDelete: "cascade" }),
-  
+  messageId: text("message_id").references(() => ticketMessage.id, {
+    onDelete: "cascade",
+  }),
+
   // Timestamps
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -311,16 +318,16 @@ export const ticketRelations = relations(ticket, ({ one, many }) => ({
   assignee: one(user, {
     fields: [ticket.assigneeId],
     references: [user.id],
-    relationName: 'TicketAssignee',
+    relationName: "TicketAssignee",
   }),
   creator: one(user, {
     fields: [ticket.creatorId],
     references: [user.id],
-    relationName: 'TicketCreator',
+    relationName: "TicketCreator",
   }),
   inbox: one(inbox, {
-      fields: [ticket.inboxId],
-      references: [inbox.id]
+    fields: [ticket.inboxId],
+    references: [inbox.id],
   }),
   messages: many(ticketMessage),
   attachments: many(ticketAttachment),
@@ -331,21 +338,45 @@ export const contactRelations = relations(contact, ({ many }) => ({
   tickets: many(ticket),
 }));
 
-export const ticketMessageRelations = relations(ticketMessage, ({ one, many }) => ({
-  ticket: one(ticket, {
-    fields: [ticketMessage.ticketId],
-    references: [ticket.id],
-  }),
-  attachments: many(ticketAttachment),
-}));
+export const ticketMessageRelations = relations(
+  ticketMessage,
+  ({ one, many }) => ({
+    ticket: one(ticket, {
+      fields: [ticketMessage.ticketId],
+      references: [ticket.id],
+    }),
+    attachments: many(ticketAttachment),
+  })
+);
 
-export const ticketAttachmentRelations = relations(ticketAttachment, ({ one }) => ({
-  ticket: one(ticket, {
-    fields: [ticketAttachment.ticketId],
-    references: [ticket.id],
-  }),
-  message: one(ticketMessage, {
-    fields: [ticketAttachment.messageId],
-    references: [ticketMessage.id],
-  }),
-}));
+export const ticketAttachmentRelations = relations(
+  ticketAttachment,
+  ({ one }) => ({
+    ticket: one(ticket, {
+      fields: [ticketAttachment.ticketId],
+      references: [ticket.id],
+    }),
+    message: one(ticketMessage, {
+      fields: [ticketAttachment.messageId],
+      references: [ticketMessage.id],
+    }),
+  })
+);
+
+// Log Schema
+export const log = pgTable("logs", {
+  id: text("id").primaryKey(),
+  title: text("message").notNull(),
+  description: text("description").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const feedback = pgTable("feedback", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  userId: text("user_id")
+    .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

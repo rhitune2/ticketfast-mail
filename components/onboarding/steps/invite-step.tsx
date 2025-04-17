@@ -101,7 +101,7 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
   const [invitations, setInvitations] = useState<any[]>([]);
   const [progress, setProgress] = useState(0);
   const [resendingId, setResendingId] = useState<string | null>(null);
-  const maxInvites = SUBSCRIPTION_QUOTAS["FREE"].organization.memberQuota;
+  const maxInvites = SUBSCRIPTION_QUOTAS["free"].organization.memberQuota;
   const router = useRouter()
   // Initialize form
   const form = useForm<InviteFormValues>({
@@ -121,7 +121,7 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
         const response = await authClient.organization.listInvitations();
 
         if ("data" in response && Array.isArray(response.data)) {
-          console.log("Invitations data:", response.data);
+          console.log("Invitations data: s asd", response.data);
           setInvitations(response.data);
 
           // Calculate progress based on the number of invitations
@@ -150,14 +150,19 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
 
   // Update progress whenever invitations change
   useEffect(() => {
-    const percentage = Math.min(100, (invitations.length / maxInvites) * 100);
+    // Only count accepted invitations for the progress calculation
+    const acceptedInvitations = invitations.filter(invite => invite.status === "accepted").length;
+    const percentage = Math.min(100, (acceptedInvitations / maxInvites) * 100);
     setProgress(percentage);
   }, [invitations, maxInvites]);
 
   async function handleAddInvitation(values: InviteFormValues) {
-    if (invitations.length >= maxInvites) {
+    // Only count accepted invitations against the limit
+    const acceptedInvitations = invitations.filter(invite => invite.status === "accepted").length;
+    
+    if (acceptedInvitations >= maxInvites) {
       toast.error("Maximum number of members reached", {
-        description: `You can invite up to ${maxInvites} members with your current plan`,
+        description: `You can have up to ${maxInvites} active members with your current plan`,
       });
       return;
     }
@@ -420,7 +425,7 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
                 <TooltipTrigger asChild>
                   <div className="flex items-center text-sm text-muted-foreground">
                     <span>
-                      {invitations.length} of {maxInvites}
+                      {invitations.filter(invite => invite.status === "accepted").length} of {maxInvites}
                     </span>
                     <Info className="ml-1 h-4 w-4" />
                   </div>
@@ -490,7 +495,7 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
                   type="submit"
                   disabled={
                     form.formState.isSubmitting ||
-                    invitations.length >= maxInvites
+                    invitations.filter(invite => invite.status === "accepted").length >= maxInvites
                   }
                   className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all duration-200"
                 >

@@ -17,14 +17,19 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const headerList = await headers();
+  const session = await auth.api.getSession({ headers: headerList });
 
   if (!session) {
     redirect("/sign-in");
   }
 
+  if (!session.user.isCompletedOnboarding) {
+    redirect("/onboarding");
+  }
+
   const currentOrganization = await auth.api.getFullOrganization({
-    headers: await headers(),
+    headers: headerList,
   });
 
   return (

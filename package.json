@@ -12,6 +12,9 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.10",
     "@ai-sdk/react": "^1.2.9",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/modifiers": "^9.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^5.0.1",
     "@polar-sh/better-auth": "^0.0.10",
     "@radix-ui/react-accordion": "^1.2.3",
@@ -43,6 +46,8 @@
     "@react-email/components": "^0.0.36",
     "@react-email/render": "^1.0.6",
     "@supabase/supabase-js": "^2.49.4",
+    "@tabler/icons-react": "^3.31.0",
+    "@tanstack/react-table": "^8.21.3",
     "@tiptap/extension-bubble-menu": "^2.11.7",
     "@tiptap/extension-highlight": "^2.11.7",
     "@tiptap/extension-image": "^2.11.7",

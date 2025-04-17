@@ -6,7 +6,7 @@ import { organization } from "@/db-schema";
 import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { z } from "zod";
-import slugify from "slugify"
+import slugify from "slugify";
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,7 +52,6 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
-
     const session = await auth.api.getSession({ headers: await headers() });
 
     if (!session) {
@@ -63,12 +62,14 @@ export async function POST(request: Request) {
     const parsedBody = await schema.parseAsync(body);
 
     // Check if organization exists for this user
-    const existingOrg = await auth.api.getFullOrganization({ headers: await headers() });
+    const existingOrg = await auth.api.getFullOrganization({
+      headers: await headers(),
+    });
 
     if (existingOrg) {
       // Update existing organization
       await auth.api.updateOrganization({
-        body : {
+        body: {
           data: {
             name: parsedBody.organizationName,
             logo: parsedBody.organizationLogo ?? "",
@@ -76,10 +77,8 @@ export async function POST(request: Request) {
           organizationId: existingOrg.id,
         },
         headers: await headers(),
-      })
-      
+      });
     } else {
-
       const checkSlug = await auth.api.checkOrganizationSlug({
         body: {
           slug: slugify(parsedBody.organizationName),
@@ -88,11 +87,14 @@ export async function POST(request: Request) {
       });
 
       if (!checkSlug) {
-        return NextResponse.json({ error: "Slug already exists" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Slug already exists" },
+          { status: 400 }
+        );
       }
 
       await auth.api.createOrganization({
-        body:{
+        body: {
           name: parsedBody.organizationName,
           slug: slugify(parsedBody.organizationName),
           logo: parsedBody.organizationLogo ?? "",

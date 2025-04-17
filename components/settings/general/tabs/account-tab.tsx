@@ -11,14 +11,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User, Session } from "@/db";
+import { User } from "@/db";
 import { Loader2 } from "lucide-react";
+import type { Session } from "@/lib/auth";
 
 interface AccountTabProps {
-  session: {
-    user: User;
-    session: Session;
-  };
+  session: Session;
   userName: string;
   setUserName: (name: string) => void;
   handleAccountSave: () => void;

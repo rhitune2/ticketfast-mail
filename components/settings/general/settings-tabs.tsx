@@ -9,12 +9,13 @@ import {
 } from "@/components/ui/card";
 import { useState, useEffect, useRef } from "react";
 import { User, Settings, CreditCard, Users } from "lucide-react";
-import { Subscription, User as UserType, Organization, Session } from "@/db";
+import { Subscription, User as UserType } from "@/db";
 
 import { ProfileTab, AccountTab, BillingTab, TeamTab } from "./tabs";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import type { Session , Organization } from "@/lib/auth"
 
 const tabs = [
   { name: "Profile", icon: User, component: ProfileTab },
@@ -24,26 +25,16 @@ const tabs = [
 ];
 
 interface SettingsTabsProps {
-  session: {
-    user: UserType;
-    session: Session;
-  };
+  session: Session;
   organization: Organization;
-  members: { userId: string; role: string; user: UserType }[];
   subscription: Subscription | null;
   isOwner: boolean;
 }
 
-type MemberWithUser = {
-  userId: string;
-  role: string;
-  user: UserType;
-};
 
 export function SettingsTabs({
   session,
   organization,
-  members,
   subscription,
   isOwner,
 }: SettingsTabsProps) {
@@ -181,8 +172,6 @@ export function SettingsTabs({
         {activeIndex === 3 && (
           <TeamTab
             organization={organization}
-            members={members}
-            session={session}
             isOwner={isOwner}
             organizationName={organizationName}
             setOrganizationName={setOrganizationName}

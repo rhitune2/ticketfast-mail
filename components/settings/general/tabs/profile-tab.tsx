@@ -9,13 +9,11 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Session } from "@/db";
+import { User } from "@/db";
+import type { Session } from "@/lib/auth"
 
 interface ProfileTabProps {
-  session: {
-    user: User;
-    session: Session;
-  };
+  session: Session
 }
 
 export function ProfileTab({ session }: ProfileTabProps) {

@@ -258,9 +258,12 @@ export const auth = betterAuth({
             : process.env.POLAR_WEBHOOK_SECRET!,
         onSubscriptionCreated: async (payload) => {
           console.log("Subscription created:", payload);
-          console.log(payload.data)
+          console.log(payload.data);
         },
       },
     }),
   ],
 });
+
+export type Session = typeof auth.$Infer.Session;
+export type Organization = typeof auth.$Infer.Organization;

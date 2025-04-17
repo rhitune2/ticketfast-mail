@@ -1,7 +1,6 @@
 import { SettingsTabs } from "@/components/settings/general/settings-tabs";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { Organization } from "@/db";
 import { getOrganizationSubscription } from "@/lib/actions";
 
 export default async function GeneralSettingsPage() {
@@ -14,14 +13,16 @@ export default async function GeneralSettingsPage() {
     getOrganizationSubscription({ headers: headerList }),
   ]);
 
-  const isOwner = session?.user.id === organization?.members.find((member) => member.role === "owner")?.userId;
+  const isOwner =
+    session?.user.id ===
+    organization?.members.find((member) => member.role === "owner")?.userId;
 
   return (
     <SettingsTabs
-      session={session}
-      organization={organization}
+      session={session!}
+      organization={organization!}
       isOwner={isOwner}
-      subscription={subscription}
+      subscription={subscription!}
     />
   );
 }

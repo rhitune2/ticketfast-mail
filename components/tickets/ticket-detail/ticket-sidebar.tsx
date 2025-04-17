@@ -26,6 +26,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Ticket, Contact, Member, User } from "@/db";
 import { Button } from "@/components/ui/button";
+import { TAGS } from "@/lib/constants";
 
 const ALLOWED_TICKET_STATUSES = [
   "ASSIGNED",
@@ -37,6 +38,8 @@ type TicketStatus = (typeof ALLOWED_TICKET_STATUSES)[number];
 
 const ALLOWED_TICKET_PRIORITIES = ["LOW", "NORMAL", "MEDIUM", "HIGH"] as const;
 type TicketPriority = (typeof ALLOWED_TICKET_PRIORITIES)[number];
+
+const tagOptions = TAGS;
 
 interface TicketSidebarProps {
   ticket: Ticket & { contact: Contact | null };
@@ -74,11 +77,12 @@ export function TicketSidebar({
   const [isUpdatingPriority, setIsUpdatingPriority] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isAssigningToMe, setIsAssigningToMe] = useState(false);
+  const [isUpdatingTag, setIsUpdatingTag] = useState(false);
 
   console.log({ assignableUsers });
 
   const handleUpdateTicket = async (
-    field: "status" | "assigneeId" | "priority",
+    field: "status" | "assigneeId" | "priority" | "tag",
     value: string | null,
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
   ) => {
@@ -97,7 +101,7 @@ export function TicketSidebar({
       }
 
       toast.success(
-        `Ticket ${field === "status" ? "status" : field === "assigneeId" ? "assignee" : "priority"} updated successfully`
+        `Ticket ${field === "status" ? "status" : field === "assigneeId" ? "assignee" : field === "tag" ? "tag" : "priority"} updated successfully`
       );
       router.refresh();
     } catch (error: any) {
@@ -211,6 +215,32 @@ export function TicketSidebar({
                 {priorityOptions.map((priority: TicketPriority) => (
                   <SelectItem key={priority} value={priority}>
                     {formatEnumString(priority)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div>
+            <Label htmlFor="tag-select">Tag</Label>
+            <Select
+              value={ticket.tag || ""}
+              onValueChange={(value) =>
+                handleUpdateTicket("tag", value === "" ? null : value, setIsUpdatingTag)
+              }
+              disabled={isUpdatingTag}
+              name="tag-select"
+            >
+              <SelectTrigger className="w-full mt-1" id="tag-select">
+                {isUpdatingTag ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                <SelectValue placeholder="Select tag" />
+              </SelectTrigger>
+              <SelectContent>
+                {tagOptions.map((tag: string) => (
+                  <SelectItem key={tag} value={tag}>
+                    {tag}
                   </SelectItem>
                 ))}
               </SelectContent>

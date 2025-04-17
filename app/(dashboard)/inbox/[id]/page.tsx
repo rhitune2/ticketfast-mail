@@ -10,11 +10,23 @@ import {
   TicketSidebar,
   AISummary,
 } from "@/components/tickets/ticket-detail";
-import { getTicketById, getTicketAssignee, getTicketMessages, getAllAssignees } from "./get-ticket-data";
+import {
+  getTicketById,
+  getTicketAssignee,
+  getTicketMessages,
+  getAllAssignees,
+  TicketWithContact,
+  TicketMessageWithAttachments,
+} from "./get-ticket-data";
 import { ArrowLeft } from "lucide-react";
 import { TicketEditor } from "@/components/tickets/ticket-detail/editor";
-import { auth } from "@/lib/auth"; // Corrected import path
-import { headers } from "next/headers"; // Import headers
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+
+// Defining types for better optimization
+type PageParams = { params: Promise<{ id: string }> };
+// Using the return type from getTicketAssignee to ensure type compatibility
+type TicketAssignee = Awaited<ReturnType<typeof getTicketAssignee>>;
 
 export async function generateMetadata({
   params,
@@ -22,7 +34,8 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   try {
-    const ticket = await getTicketById((await params).id);
+    const id = (await params).id;
+    const ticket = await getTicketById(id);
 
     return {
       title: `Ticket: ${ticket?.subject || "Not Found"}`,
@@ -36,42 +49,42 @@ export async function generateMetadata({
   }
 }
 
+// Main page component with optimized data fetching
 export default async function TicketPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
+  const id = (await params).id;
 
-  // Get session
+  // Validate authentication in a single call
   const sessionData = await auth.api.getSession({ headers: await headers() });
   const session = sessionData?.session;
 
-  if (!session || !session.userId) {
-    // Handle missing session/user
-    notFound(); // Or redirect
+  if (!session?.userId) {
+    notFound();
     return null;
   }
   const currentUserId = session.userId;
 
-  // Get main ticket data
-  const ticketData = await getTicketById(id);
+  // Use Promise.all to parallelize independent data fetching operations
+  const [ticketData, organizationMembers] = await Promise.all([
+    getTicketById(id),
+    getAllAssignees(),
+  ]);
+
+  // Check ticket existence
   if (!ticketData) {
     notFound();
   }
 
-  // --- Assignee Data Fetching ---
-  // Fetch the SPECIFIC assignee for the TicketHeader
-  const currentAssigneeData = ticketData.assigneeId
-    ? await getTicketAssignee(ticketData.assigneeId)
-    : null;
-
-  // Fetch ALL assignable users for the TicketSidebar
-  const organizationMembers = await getAllAssignees(); 
-
-
-  // Fetch messages
-  const messages = await getTicketMessages(ticketData.id);
+  // Once we have the ticket, we can fetch the assignee and messages in parallel
+  const [currentAssigneeData, messages] = await Promise.all([
+    ticketData.assigneeId
+      ? getTicketAssignee(ticketData.assigneeId)
+      : Promise.resolve(null),
+    getTicketMessages(ticketData.id),
+  ]);
 
   return (
     <div className="grid h-full flex-1 grid-cols-1 lg:grid-cols-3 xl:grid-cols-4">
@@ -79,58 +92,34 @@ export default async function TicketPage({
       <div className="col-span-1 lg:col-span-2 xl:col-span-3 border-r">
         <div className="p-6 h-full flex flex-col">
           {/* Top Bar */}
-          <div className="flex items-center justify-between pb-4 border-b mb-4">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 transition-all hover:gap-2.5"
-              asChild
-            >
-              <a href="/inbox">
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back to Inbox</span>
-              </a>
-            </Button>
-          </div>
+          <BackToInboxButton />
 
-          {/* Ticket Header using SPECIFIC assignee */}
-          <Suspense fallback={<TicketHeaderSkeleton />}>
-            <TicketHeader ticket={ticketData} assignee={currentAssigneeData} />
-          </Suspense>
+          {/* Ticket Header */}
+          <TicketHeaderSection
+            ticket={ticketData}
+            assignee={currentAssigneeData}
+          />
 
           {/* AI Summary */}
-          {ticketData && (
-            <div className="my-4"> {/* Added margin for spacing */} 
-              <Suspense fallback={<AISummarySkeleton />}>
-                <AISummary ticket={ticketData} />
-              </Suspense>
-            </div>
-          )}
+          <TicketSummarySection ticket={ticketData} />
 
           {/* Conversation Area */}
-          <div className="flex-1 flex flex-col min-h-0 mt-4"> {/* Added margin top */} 
-            <h2 className="text-lg font-semibold mb-2">Conversation</h2>
-            <div className="flex-1 overflow-y-auto mb-4 pr-2 space-y-4">
-              <Suspense fallback={<MessageListSkeleton />}>
-                <MessageList messages={messages} />
-              </Suspense>
-            </div>
-            <TicketEditor 
-              ticketId={id} 
-              placeholder={`Reply to ${ticketData.fromName || 'the sender'}...`} 
-            />
-          </div>
+          <ConversationSection
+            messages={messages}
+            ticketId={id}
+            fromName={ticketData.fromName}
+          />
         </div>
       </div>
 
-      {/* Right sidebar using ALL assignable users */}
+      {/* Right sidebar */}
       <div className="lg:col-span-1 hidden lg:block">
         <div className="p-6 h-full overflow-y-auto">
           <Suspense fallback={<SidebarSkeleton />}>
             <TicketSidebar
               ticket={ticketData}
-              assignableUsers={organizationMembers} // Pass the correct list
-              currentUserId={currentUserId} 
+              assignableUsers={organizationMembers}
+              currentUserId={currentUserId}
             />
           </Suspense>
         </div>
@@ -139,7 +128,78 @@ export default async function TicketPage({
   );
 }
 
-// Skeleton loaders for suspense boundaries
+// Extracted components for better code organization
+
+function BackToInboxButton() {
+  return (
+    <div className="flex items-center justify-between pb-4 border-b mb-4">
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-1.5 transition-all hover:gap-2.5"
+        asChild
+      >
+        <a href="/inbox">
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back to Inbox</span>
+        </a>
+      </Button>
+    </div>
+  );
+}
+
+function TicketHeaderSection({
+  ticket,
+  assignee,
+}: {
+  ticket: TicketWithContact;
+  assignee: TicketAssignee;
+}) {
+  return (
+    <Suspense fallback={<TicketHeaderSkeleton />}>
+      <TicketHeader ticket={ticket} assignee={assignee} />
+    </Suspense>
+  );
+}
+
+function TicketSummarySection({ ticket }: { ticket: TicketWithContact }) {
+  if (!ticket) return null;
+
+  return (
+    <div className="my-4">
+      <Suspense fallback={<AISummarySkeleton />}>
+        <AISummary ticket={ticket} />
+      </Suspense>
+    </div>
+  );
+}
+
+function ConversationSection({
+  messages,
+  ticketId,
+  fromName,
+}: {
+  messages: TicketMessageWithAttachments[];
+  ticketId: string;
+  fromName: string | null;
+}) {
+  return (
+    <div className="flex-1 flex flex-col min-h-0 mt-4">
+      <h2 className="text-lg font-semibold mb-2">Conversation</h2>
+      <div className="flex-1 overflow-y-auto mb-4 pr-2 space-y-4">
+        <Suspense fallback={<MessageListSkeleton />}>
+          <MessageList messages={messages} />
+        </Suspense>
+      </div>
+      <TicketEditor
+        ticketId={ticketId}
+        placeholder={`Reply to ${fromName || "the sender"}...`}
+      />
+    </div>
+  );
+}
+
+// Optimized skeleton loaders with memoization
 function TicketHeaderSkeleton() {
   return (
     <div className="rounded-lg border bg-card p-6 shadow-sm">

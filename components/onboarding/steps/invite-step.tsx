@@ -102,7 +102,7 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
   const [progress, setProgress] = useState(0);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const maxInvites = SUBSCRIPTION_QUOTAS["free"].organization.memberQuota;
-  const router = useRouter()
+  const router = useRouter();
   // Initialize form
   const form = useForm<InviteFormValues>({
     resolver: zodResolver(inviteFormSchema),
@@ -151,15 +151,19 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
   // Update progress whenever invitations change
   useEffect(() => {
     // Only count accepted invitations for the progress calculation
-    const acceptedInvitations = invitations.filter(invite => invite.status === "accepted").length;
+    const acceptedInvitations = invitations.filter(
+      (invite) => invite.status === "accepted"
+    ).length;
     const percentage = Math.min(100, (acceptedInvitations / maxInvites) * 100);
     setProgress(percentage);
   }, [invitations, maxInvites]);
 
   async function handleAddInvitation(values: InviteFormValues) {
     // Only count accepted invitations against the limit
-    const acceptedInvitations = invitations.filter(invite => invite.status === "accepted").length;
-    
+    const acceptedInvitations = invitations.filter(
+      (invite) => invite.status === "accepted"
+    ).length;
+
     if (acceptedInvitations >= maxInvites) {
       toast.error("Maximum number of members reached", {
         description: `You can have up to ${maxInvites} active members with your current plan`,
@@ -232,13 +236,13 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
       const invitation = invitations.find((inv) => inv.id === invitationId);
       if (!invitation) return;
 
-      const { data , error } = await authClient.organization.inviteMember({
+      const { data, error } = await authClient.organization.inviteMember({
         email: invitation.email,
         role: invitation.role as "member" | "admin" | "owner",
         resend: true,
       });
 
-      if(error){
+      if (error) {
         toast.error("Failed to resend invitation", {
           description: error.message || "Please try again later",
         });
@@ -254,7 +258,6 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
       toast.success("Invitation resent", {
         description: `A new invitation has been sent to ${invitation.email}`,
       });
-      
     } catch (error) {
       console.error("Error resending invitation:", error);
       toast.error("Failed to resend invitation", {
@@ -281,12 +284,13 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
       }
 
       toast.success("Setup complete", {
-        description: "Your organization has been created successfully and team invitations have been sent.",
+        description:
+          "Your organization has been created successfully and team invitations have been sent.",
       });
 
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 2500);
+      // setTimeout(() => {
+      //   router.push("/dashboard");
+      // }, 2500);
 
       if (onNext) {
         onNext();
@@ -303,6 +307,24 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
     }
   }
 
+  const [ticketfastEmail, setTicketfastEmail] = useState();
+
+  useEffect(() => {
+    if (isComplete) {
+      (async () => {
+        try {
+          const response = await fetch(`/api/get-email`, { method: "GET" });
+          const data = await response.json();
+          setTicketfastEmail(data.email);
+        } catch (error) {
+          toast.error("Failed to get ticketfast email", {
+            description: "Please try again later",
+          });
+        }
+      })();
+    }
+  }, [isComplete]);
+
   if (isComplete) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-10">
@@ -317,9 +339,16 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
           have been sent. You can now start using TicketFast to manage your
           customer support tickets.
         </p>
+        <p className="text-slate-500 dark:text-slate-400 mt-3 text-center max-w-md leading-relaxed">
+          <span className="font-semibold text-rose-400">{ticketfastEmail ?? "Loading.."}</span>
+          <br />
+          Add redirection rule to this email for receiving tickets.
+        </p>
         <Button
           className="mt-8 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md transition-all duration-200"
           size="lg"
+          onClick={() => router.push("/dashboard")}
+          disabled={ticketfastEmail === undefined}
         >
           Go to Dashboard
         </Button>
@@ -425,7 +454,12 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
                 <TooltipTrigger asChild>
                   <div className="flex items-center text-sm text-muted-foreground">
                     <span>
-                      {invitations.filter(invite => invite.status === "accepted").length} of {maxInvites}
+                      {
+                        invitations.filter(
+                          (invite) => invite.status === "accepted"
+                        ).length
+                      }{" "}
+                      of {maxInvites}
                     </span>
                     <Info className="ml-1 h-4 w-4" />
                   </div>
@@ -495,7 +529,8 @@ export function InviteStep({ onBack, onNext, user }: InviteStepProps) {
                   type="submit"
                   disabled={
                     form.formState.isSubmitting ||
-                    invitations.filter(invite => invite.status === "accepted").length >= maxInvites
+                    invitations.filter((invite) => invite.status === "accepted")
+                      .length >= maxInvites
                   }
                   className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all duration-200"
                 >

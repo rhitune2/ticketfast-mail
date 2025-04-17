@@ -1,10 +1,10 @@
-import { db, ticketMessage, ticket, smtpSettings } from "@/db";
+import { db, ticketMessage, ticket, smtpSettings, user } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
-import { sendTicket } from "@/utils/email";
+import { sendTicket, sendAssigneeNotification } from "@/utils/email";
 
 export async function POST(
   request: Request,
@@ -102,6 +102,31 @@ export async function POST(
         });
       }
       console.log(`Email sent successfully for ticket ${ticketId}`);
+      
+      // Send notification to assignee if one exists
+      if (existingTicket.assigneeId) {
+        try {
+          // Get assignee information
+          const assignee = await db.query.user.findFirst({
+            where: eq(user.id, existingTicket.assigneeId)
+          });
+          
+          if (assignee && assignee.email) {
+            await sendAssigneeNotification({
+              assigneeEmail: assignee.email,
+              ticketSubject: existingTicket.subject,
+              ticketId: ticketId,
+              fromName: userName,
+              fromEmail: userEmail,
+              messageContent: content
+            });
+            console.log(`Assignee notification sent successfully to ${assignee.email}`);
+          }
+        } catch (assigneeEmailError) {
+          console.error(`Failed to send notification to assignee for ticket ${ticketId}:`, assigneeEmailError);
+          // Continue execution even if assignee notification fails
+        }
+      }
     } catch (emailError) {
       console.error(`Failed to send email for ticket ${ticketId}:`, emailError);
       // Continue execution to at least save the message in the database

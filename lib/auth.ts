@@ -166,15 +166,18 @@ export const auth = betterAuth({
             where: eq(subscription.userId, userContext.user.id),
           });
 
+          // currently adding +1 because owner doesnt count.
+          // we will fix it in future.
+          // i know man.
           switch (userSubscription?.plan) {
             case "free":
-              return SUBSCRIPTION_QUOTAS.free.organization.memberQuota;
+              return SUBSCRIPTION_QUOTAS.free.organization.memberQuota + 1;
             case "pro":
-              return SUBSCRIPTION_QUOTAS.pro.organization.memberQuota;
+              return SUBSCRIPTION_QUOTAS.pro.organization.memberQuota + 1;
             case "enterprise":
-              return SUBSCRIPTION_QUOTAS.enterprise.organization.memberQuota;
+              return SUBSCRIPTION_QUOTAS.enterprise.organization.memberQuota + 1;
             default:
-              return SUBSCRIPTION_QUOTAS.free.organization.memberQuota;
+              return SUBSCRIPTION_QUOTAS.free.organization.memberQuota + 1;
           }
         } catch (error) {
           console.error("Error checking invitation limit:", error);

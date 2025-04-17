@@ -19,7 +19,7 @@ const steps = [
 ];
 
 export function OnboardingWizard({ user, organization }: { user: User, organization?: Organization | null }) {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(0);
   const [animationDirection, setAnimationDirection] = useState<"next" | "prev">(
     "next"
   );

@@ -5,6 +5,8 @@ import { eq } from "drizzle-orm";
 import { render } from "@react-email/render";
 import { VerificationTemplate } from "./email-templates/verification-template";
 import { OrganizationInviteTemplate } from "./email-templates/organization-invite-template";
+import { AssigneeNotificationTemplate } from "./email-templates/assignee-notification-template";
+import { TicketAssignmentTemplate } from "./email-templates/ticket-assignment-template";
 import nodemailer from "nodemailer";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
@@ -15,7 +17,9 @@ import { headers } from "next/headers";
 export type Template =
   | "verification-template"
   | "otp-template"
-  | "organization-invite-template";
+  | "organization-invite-template"
+  | "assignee-notification-template"
+  | "ticket-assignment-template";
 
 /**
  * Interface for email sending props
@@ -64,6 +68,14 @@ async function renderEmailTemplate(
         OrganizationInviteTemplate(
           props as OrganizationInviteEmailTemplateProps
         )
+      );
+    case "assignee-notification-template":
+      return render(
+        AssigneeNotificationTemplate(props)
+      );
+    case "ticket-assignment-template":
+      return render(
+        TicketAssignmentTemplate(props)
       );
     default:
       throw new Error(`Unknown email template: ${template}`);
@@ -139,6 +151,142 @@ interface SendOrganizationInvitationProps {
  * @param params The invitation email parameters
  * @returns The result of the email sending operation
  */
+/**
+ * Interface for assignee notification email props
+ */
+interface SendAssigneeNotificationProps {
+  assigneeEmail: string;
+  ticketSubject: string;
+  ticketId: string;
+  fromName?: string;
+  fromEmail?: string;
+  messageContent: string;
+}
+
+/**
+ * Sends notification email to ticket assignee
+ * @param params The notification email parameters
+ * @returns The result of the email sending operation
+ */
+/**
+ * Interface for ticket assignment notification email props
+ */
+interface SendTicketAssignmentProps {
+  assigneeEmail: string;
+  ticketSubject: string;
+  ticketId: string;
+  assignerName?: string;
+  priority?: string;
+  status?: string;
+}
+
+/**
+ * Sends notification email when a ticket is assigned to someone
+ * @param params The assignment notification email parameters
+ * @returns The result of the email sending operation
+ */
+export async function sendTicketAssignment({
+  assigneeEmail,
+  ticketSubject,
+  ticketId,
+  assignerName,
+  priority,
+  status,
+}: SendTicketAssignmentProps): Promise<any> {
+  try {
+    const dashboardUrl = `${process.env.NODE_ENV === "development" ? "http://localhost:3000" : "https://ticketfa.st"}/tickets/${ticketId}`;
+    
+    // Render the email template using React Email
+    const htmlContent = await renderEmailTemplate(
+      "ticket-assignment-template",
+      {
+        ticketSubject,
+        ticketId,
+        dashboardUrl,
+        assignerName,
+        priority,
+        status,
+      }
+    );
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.forwardemail.net",
+      port: 465,
+      secure: true,
+      auth: {
+        user: "no-reply@ticketfa.st",
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    });
+
+    const options = {
+      from: "TicketFast <no-reply@ticketfa.st>",
+      to: assigneeEmail,
+      subject: `Ticket Assigned to You: ${ticketSubject}`,
+      html: htmlContent,
+    };
+
+    const result = await transporter.sendMail(options);
+
+    console.log("Ticket assignment email sent successfully to:", assigneeEmail);
+    return result;
+  } catch (error) {
+    console.error("Failed to send ticket assignment email:", error);
+    throw error;
+  }
+}
+
+export async function sendAssigneeNotification({
+  assigneeEmail,
+  ticketSubject,
+  ticketId,
+  fromName,
+  fromEmail,
+  messageContent,
+}: SendAssigneeNotificationProps): Promise<any> {
+  try {
+    const dashboardUrl = `${process.env.NODE_ENV === "development" ? "http://localhost:3000" : "https://ticketfa.st"}/tickets/${ticketId}`;
+    
+    // Render the email template using React Email
+    const htmlContent = await renderEmailTemplate(
+      "assignee-notification-template",
+      {
+        ticketSubject,
+        ticketId,
+        dashboardUrl,
+        fromName,
+        fromEmail,
+        messageContent,
+      }
+    );
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.forwardemail.net",
+      port: 465,
+      secure: true,
+      auth: {
+        user: "no-reply@ticketfa.st",
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    });
+
+    const options = {
+      from: "TicketFast <no-reply@ticketfa.st>",
+      to: assigneeEmail,
+      subject: `New Reply to Ticket: ${ticketSubject}`,
+      html: htmlContent,
+    };
+
+    const result = await transporter.sendMail(options);
+
+    console.log("Assignee notification email sent successfully to:", assigneeEmail);
+    return result;
+  } catch (error) {
+    console.error("Failed to send assignee notification email:", error);
+    throw error;
+  }
+}
+
 export async function sendOrganizationInvitation({
   email,
   inviteLink,

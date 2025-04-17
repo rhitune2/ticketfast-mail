@@ -54,10 +54,22 @@ function SettingsTabsContent({
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
 
+  // Initialize activeIndex state based on initial URL param
   const [activeIndex, setActiveIndex] = useState(() => {
     const index = tabs.findIndex((tab) => tab.id === tabParam);
     return index >= 0 ? index : 0;
   });
+
+  // Effect to sync state with URL param changes (e.g., back/forward navigation)
+  useEffect(() => {
+    const indexFromParam = tabs.findIndex((tab) => tab.id === tabParam);
+    const newActiveIndex = indexFromParam >= 0 ? indexFromParam : 0;
+    if (newActiveIndex !== activeIndex) {
+      setActiveIndex(newActiveIndex);
+    }
+    // Only run when tabParam changes, not activeIndex
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabParam]);
 
   useEffect(() => {
     if (hoveredIndex !== null) {
@@ -72,6 +84,7 @@ function SettingsTabsContent({
     }
   }, [hoveredIndex]);
 
+  // Effect for active indicator style - depends on local activeIndex state
   useEffect(() => {
     const activeElement = tabRefs.current[activeIndex];
     if (activeElement) {
@@ -183,10 +196,12 @@ function SettingsTabsContent({
                     toast.info("Only owner/admin can access Email settings.");
                     return;
                   }
+                  // Update state immediately for responsiveness
                   setActiveIndex(index);
+                  // Update URL without full page reload
                   const params = new URLSearchParams(searchParams.toString());
                   params.set("tab", tabs[index].id);
-                  window.history.pushState(null, "", `?${params.toString()}`);
+                  router.push(`?${params.toString()}`, { scroll: false });
                 }}
               >
                 <tab.icon className="h-4 w-4" />

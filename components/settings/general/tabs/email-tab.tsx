@@ -30,6 +30,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"; // Import Card components
+import { useRouter } from "next/navigation";
 
 // Define the Zod schema based on db-schema.ts
 const emailSettingsSchema = z.object({
@@ -58,6 +59,12 @@ export function EmailTab({
 }: EmailTabProps) {
   const [isTesting, setIsTesting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false); // Renamed from isSaving for clarity
+
+  const router = useRouter();
+  
+  if(!isOwner){
+    router.push("/settings");
+  }
 
   const form = useForm<EmailSettingsFormValues>({
     resolver: zodResolver(emailSettingsSchema),

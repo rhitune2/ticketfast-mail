@@ -8,6 +8,7 @@ import {
   subscription,
   ticket,
   log,
+  invitation,
 } from "@/db-schema";
 import { auth } from "./auth";
 import { headers } from "next/headers";
@@ -92,11 +93,13 @@ export async function createFreeSubscription(
 
   if (!currentUser) return null;
 
-  const isInvited = await db.query.member.findFirst({
-    where: eq(member.userId, userId),
+  const isInvited = await db.query.invitation.findFirst({
+    where: eq(invitation.email, currentUser.email),
   });
 
   if (isInvited) return null;
+
+  // check for is invited
 
   const insertSubscription = await db
     .insert(subscription)
@@ -135,6 +138,14 @@ export async function createDefaultInbox(
     console.error("No organization found for user");
     return null;
   }
+
+  // check if inbox exists
+
+  const inboxExists = await db.query.inbox.findFirst({
+    where: eq(inbox.organizationId, userOrganization.id),
+  });
+
+  if (inboxExists) return null;
 
   // Generate random 8 character string for email address
   const randomString = Math.random().toString(36).substring(2, 10);
@@ -208,6 +219,7 @@ export async function createSubscription(
   payload: any,
   type: "free" | "pro" | "enterprise"
 ): Promise<Subscription | null> {
+
   const client = new Polar({
     accessToken:
       process.env.NODE_ENV === "development"
@@ -220,9 +232,13 @@ export async function createSubscription(
     id: payload.customer.id,
   });
 
+  console.log({ customer })
+
   const currentUser = await db.query.user.findFirst({
     where: eq(user.email, customer.email),
   });
+
+  console.log({ currentUser })
 
   if (!currentUser) {
     return null;
@@ -231,6 +247,8 @@ export async function createSubscription(
   const userOrganization = await db.query.member.findFirst({
     where: eq(member.userId, currentUser.id),
   });
+
+  console.log({ userOrganization })
 
   // We need to ensure we have a valid userId
   if (!userOrganization || !userOrganization.userId) {
@@ -264,6 +282,8 @@ export async function createSubscription(
     updatedAt: new Date(),
   };
 
+  console.log({ insertValues })
+
   try {
     const result = await db
       .insert(subscription)
@@ -273,6 +293,8 @@ export async function createSubscription(
         set: updateValues,
       })
       .returning();
+
+      console.log({ result })
 
     try {
       const lockedTickets = await db
@@ -298,9 +320,6 @@ export async function createSubscription(
       }
 
       if (lockedTickets.length >= result[0].ticketQuota) {
-
-        // Send mail
-
         await db
           .insert(log)
           .values({
@@ -325,6 +344,7 @@ export async function createSubscription(
     }
 
     if (result && result.length > 0) {
+      console.error("Subscription upsert for user", userId, "returned no data.")
       return result[0] as Subscription;
     } else {
       console.error(`Subscription upsert for user ${userId} returned no data.`);

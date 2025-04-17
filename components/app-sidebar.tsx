@@ -91,20 +91,6 @@ export function AppSidebar({
       title: "Tickets",
       url: "/inbox",
       icon: Ticket,
-      items: [
-        {
-          title: "All Tickets",
-          url: "/inbox?filter=all",
-        },
-        {
-          title: "My Tickets",
-          url: "/inbox?filter=mine",
-        },
-        {
-          title: "Unassigned",
-          url: "/inbox?filter=unassigned",
-        },
-      ],
     },
     {
       title: "Templates",

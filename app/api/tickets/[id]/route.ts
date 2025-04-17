@@ -3,9 +3,11 @@ import { z } from "zod";
 import { eq, and } from "drizzle-orm"; // Import and
 
 import { db } from "@/db";
-import { ticket } from "@/db-schema";
+import { ticket, user } from "@/db-schema";
 import { auth } from "@/lib/auth"; // Assuming requiresAuth is the auth middleware
 import { headers } from "next/headers";
+import { sendTicketAssignment } from "@/utils/email";
+import { TAGS } from "@/lib/constants";
 
 // Define allowed statuses based on db-schema comments
 const ALLOWED_TICKET_STATUSES = [
@@ -30,8 +32,9 @@ const updateTicketSchema = z.object({
   status: z.enum(ALLOWED_TICKET_STATUSES).optional(),
   assigneeId: z.string().nullable().optional(), // Allow null for unassigning
   priority: z.enum(ALLOWED_TICKET_PRIORITIES).optional(),
+  tag: z.enum(TAGS as [string, ...string[]]).nullable().optional(), // Add tag support with validation
 }).refine(data => Object.keys(data).length > 0, { // Ensure at least one field is provided
-  message: "At least one field (status, assigneeId, priority) must be provided for update",
+  message: "At least one field (status, assigneeId, priority, tag) must be provided for update",
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -53,6 +56,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!validation.success) {
     return NextResponse.json({ error: "Validation failed", details: validation.error.errors }, { status: 400 });
   }
+  
+  // For debugging purposes
+  console.log("Received update request:", body);
 
   const session = await auth.api.getSession({ headers: await headers() });
 
@@ -60,18 +66,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const isHaveAccess = await db.query.ticket.findFirst({
+  const existingTicket = await db.query.ticket.findFirst({
     where: and(
       eq(ticket.id, ticketId),
       eq(ticket.organizationId, session.session.activeOrganizationId)
     )
   });
 
-  if (!isHaveAccess) {
+  if (!existingTicket) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { status, assigneeId, priority } = validation.data;
+  const { status, assigneeId, priority, tag } = validation.data;
 
   // Construct the update payload
   const updatePayload: Partial<typeof ticket.$inferInsert> = {
@@ -86,6 +92,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (priority !== undefined) {
     updatePayload.priority = priority;
   }
+  if (tag !== undefined) { // Handle tag updates
+    updatePayload.tag = tag;
+  }
 
   // Check if there's anything to update besides the timestamp
   if (Object.keys(updatePayload).length <= 1) {
@@ -94,6 +103,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 
   try {
+    // Get current user's name for email notification
+    const currentUser = await db.query.user.findFirst({
+      where: eq(user.id, session.session.userId)
+    });
+    
     // Perform the update
     const updatedTicket = await db
       .update(ticket)
@@ -103,6 +117,31 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     if (updatedTicket.length === 0) {
       return NextResponse.json({ error: "Ticket not found or not authorized" }, { status: 404 });
+    }
+    
+    // Send notification if a user was assigned
+    if (assigneeId !== undefined && assigneeId !== null && assigneeId !== existingTicket.assigneeId) {
+      try {
+        // Get assignee information
+        const assignee = await db.query.user.findFirst({
+          where: eq(user.id, assigneeId)
+        });
+        
+        if (assignee && assignee.email) {
+          await sendTicketAssignment({
+            assigneeEmail: assignee.email,
+            ticketSubject: existingTicket.subject,
+            ticketId: ticketId,
+            assignerName: currentUser?.name,
+            priority: updatedTicket[0].priority,
+            status: updatedTicket[0].status
+          });
+          console.log(`Ticket assignment notification sent successfully to ${assignee.email}`);
+        }
+      } catch (emailError) {
+        console.error(`Failed to send assignment notification for ticket ${ticketId}:`, emailError);
+        // Continue execution even if email fails
+      }
     }
 
     return NextResponse.json(updatedTicket[0]);

@@ -54,6 +54,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { TAGS } from "@/lib/constants";
 
 export function TicketTable({ tickets, pageSize = 10 }: TicketTableProps) {
   // State for sorting, filtering, and pagination
@@ -70,6 +71,7 @@ export function TicketTable({ tickets, pageSize = 10 }: TicketTableProps) {
   const [filters, setFilters] = useState<FilterConfig>({
     status: "ALL",
     priority: "ALL",
+    tag: "ALL",
     search: "",
   });
 
@@ -90,6 +92,7 @@ export function TicketTable({ tickets, pageSize = 10 }: TicketTableProps) {
     "MEDIUM",
     "HIGH",
   ];
+  const tagOptions: (string | "ALL")[] = ["ALL", ...TAGS];
 
   // Handle sorting changes
   const handleSort = useCallback((column: string) => {
@@ -111,6 +114,10 @@ export function TicketTable({ tickets, pageSize = 10 }: TicketTableProps) {
 
     if (filters.priority !== "ALL") {
       result = result.filter((ticket) => ticket.priority === filters.priority);
+    }
+    
+    if (filters.tag !== "ALL") {
+      result = result.filter((ticket) => ticket.tag === filters.tag);
     }
 
     if (filters.search) {
@@ -247,6 +254,47 @@ export function TicketTable({ tickets, pageSize = 10 }: TicketTableProps) {
     return <Badge variant={config.variant as any}>{config.label}</Badge>;
   };
 
+  // Render the tag badge
+  const renderTagBadge = (tag: string | null) => {
+    if (!tag) return null;
+    
+    // Define tag colors based on tag type
+    const tagConfig: Record<string, { className: string }> = {
+      SPAM: {
+        className: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
+      },
+      JOB: {
+        className: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
+      },
+      FEEDBACK: {
+        className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+      },
+      BUG: {
+        className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+      },
+      BILLING: {
+        className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300",
+      },
+      URGENT: {
+        className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
+      },
+      SUPPORT: {
+        className: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300",
+      },
+    };
+
+    // Fallback for tags not in the config
+    const config = tagConfig[tag] || { 
+      className: "bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300" 
+    };
+
+    return (
+      <Badge className={config.className} variant="outline">
+        {tag}
+      </Badge>
+    );
+  };
+
   // Render the priority badge with appropriate colors
   const renderPriorityBadge = (priority: TicketPriority) => {
     const priorityConfig = {
@@ -361,6 +409,32 @@ export function TicketTable({ tickets, pageSize = 10 }: TicketTableProps) {
               </SelectContent>
             </Select>
           </div>
+          
+          <div className="flex items-center space-x-2">
+            <Select
+              value={filters.tag}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  tag: value as string | "ALL",
+                }))
+              }
+            >
+              <SelectTrigger className="w-[130px]">
+                <div className="flex items-center">
+                  <Filter className="mr-2 h-4 w-4" />
+                  <span>Tag</span>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {tagOptions.map((tag) => (
+                  <SelectItem key={tag} value={tag}>
+                    {tag === "ALL" ? "All Tags" : tag}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="relative w-full sm:w-64">
@@ -406,6 +480,14 @@ export function TicketTable({ tickets, pageSize = 10 }: TicketTableProps) {
                 </div>
               </TableHead>
               <TableHead
+                className="cursor-pointer"
+                onClick={() => handleSort("tag")}
+              >
+                <div className="flex items-center">
+                  Tag {renderSortIcon("tag")}
+                </div>
+              </TableHead>
+              <TableHead
                 className="hidden cursor-pointer md:table-cell"
                 onClick={() => handleSort("fromEmail")}
               >
@@ -448,8 +530,11 @@ export function TicketTable({ tickets, pageSize = 10 }: TicketTableProps) {
                   <TableCell>
                     {renderPriorityBadge(ticket.priority as TicketPriority)}
                   </TableCell>
+                  <TableCell>
+                    {ticket.tag ? renderTagBadge(ticket.tag) : null}
+                  </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <span className="truncate max-w-[150px] block">
+                    <span className="max-w-[150px] block">
                       {ticket.fromEmail}
                     </span>
                   </TableCell>

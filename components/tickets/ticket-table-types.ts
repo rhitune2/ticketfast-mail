@@ -18,6 +18,7 @@ export interface SortConfig {
 export interface FilterConfig {
   status: TicketStatus | "ALL";
   priority: TicketPriority | "ALL";
+  tag: string | "ALL";
   search: string;
 }
 

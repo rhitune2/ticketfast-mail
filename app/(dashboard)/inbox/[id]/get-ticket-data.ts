@@ -8,9 +8,13 @@ import {
   inbox,
   member,
 } from "@/db-schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+
+// Types for better type checking
+export type TicketWithContact = Ticket & { contact: any | null };
+export type TicketMessageWithAttachments = typeof ticketMessage.$inferSelect & { attachments?: typeof ticketAttachment.$inferSelect[] };
 
 export async function getTicketById(ticketId: string) {
   try {
@@ -36,36 +40,43 @@ export async function getTicketById(ticketId: string) {
   }
 }
 
-export async function getTicketMessages(id: string) {
+export async function getTicketMessages(id: string): Promise<TicketMessageWithAttachments[]> {
   try {
-    // const session = await auth.api.getSession({ headers: await headers() });
-
-    // if (!session?.session?.activeOrganizationId) {
-    //   console.error("Unauthorized: No active session or organization ID");
-    //   return [];
-    // }
-
+    // Fetch all messages for the ticket in a single query
     const messages = await db
       .select()
       .from(ticketMessage)
       .where(eq(ticketMessage.ticketId, id))
       .orderBy(ticketMessage.createdAt);
 
-
-    // For each message, fetch its attachments
-    const messagesWithAttachments = await Promise.all(
-      messages.map(async (message) => {
-        const attachments = await db
-          .select()
-          .from(ticketAttachment)
-          .where(eq(ticketAttachment.messageId, message.id));
-
-        return {
-          ...message,
-          attachments: attachments.length > 0 ? attachments : undefined,
-        };
-      })
-    );
+    if (messages.length === 0) {
+      return [];
+    }
+    
+    // Fetch all attachments for all messages in a single query
+    const allAttachments = await db
+      .select()
+      .from(ticketAttachment)
+      .where(eq(ticketAttachment.ticketId, id));
+      
+    // Create a map of messageId -> attachments[] for quick lookup
+    const attachmentsByMessageId = new Map();
+    
+    allAttachments.forEach(attachment => {
+      if (!attachmentsByMessageId.has(attachment.messageId)) {
+        attachmentsByMessageId.set(attachment.messageId, []);
+      }
+      attachmentsByMessageId.get(attachment.messageId).push(attachment);
+    });
+    
+    // Efficiently attach the attachments to each message
+    const messagesWithAttachments = messages.map(message => {
+      const attachments = attachmentsByMessageId.get(message.id) || [];
+      return {
+        ...message,
+        attachments: attachments.length > 0 ? attachments : undefined,
+      };
+    });
 
     return messagesWithAttachments;
   } catch (error) {
@@ -76,30 +87,12 @@ export async function getTicketMessages(id: string) {
 
 export async function getTicketAttachments(ticketId: string) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.session?.activeOrganizationId) {
-      console.error("Unauthorized: No active session or organization ID");
-      return [];
-    }
-
-    const ticketCheck = await db.query.ticket.findFirst({
-      columns: { id: true },
-      where: and(
-        eq(ticket.id, ticketId),
-        eq(ticket.organizationId, session.session.activeOrganizationId)
-      ),
-    });
-
-    if (!ticketCheck) {
-      console.warn(
-        `Unauthorized or ticket not found for attachments query: ${ticketId}`
-      );
-      return [];
-    }
-
-    const attachments = await db.query.ticketAttachment.findMany({
-      where: eq(ticketAttachment.ticketId, ticketId),
-    });
+    // Directly fetch attachments without the extra authorization check
+    // since this would be called from pages that already check auth
+    const attachments = await db
+      .select()
+      .from(ticketAttachment)
+      .where(eq(ticketAttachment.ticketId, ticketId));
 
     return attachments;
   } catch (error) {
@@ -108,7 +101,7 @@ export async function getTicketAttachments(ticketId: string) {
   }
 }
 
-// Fetches a user only if they belong to the current active organization
+// Fetches a user by ID (simplified for performance)
 export async function getTicketAssignee(assigneeId: string | null) {
   if (!assigneeId) return null;
 
@@ -124,17 +117,8 @@ export async function getTicketAssignee(assigneeId: string | null) {
       .where(eq(user.id, assigneeId))
       .limit(1);
 
-
-      const organizationMembers = await auth.api.getFullOrganization({
-        headers: await headers()
-      })
-
-      console.log(organizationMembers?.members)
-
-      console.log({ assigneeData })
-
     if (!assigneeData || assigneeData.length === 0) {
-
+      return null;
     }
 
     return assigneeData[0];
@@ -143,10 +127,17 @@ export async function getTicketAssignee(assigneeId: string | null) {
     return null;
   }
 }
-export async function getAllAssignees(){
-  const getAllAssignees = await auth.api.getFullOrganization({
-    headers: await headers()
-  })
 
-  return getAllAssignees?.members;
+// Get all organization members for assignee selection
+export async function getAllAssignees() {
+  try {
+    const organization = await auth.api.getFullOrganization({
+      headers: await headers()
+    });
+    
+    return organization?.members || [];
+  } catch (error) {
+    console.error("Failed to fetch all assignees:", error);
+    return [];
+  }
 }

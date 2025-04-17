@@ -239,19 +239,34 @@ export async function createSubscription(
 
   console.log({ customer })
 
-  const currentUser = await db.query.user.findFirst({
-    where: eq(user.email, customer.email),
-  });
+  let currentUser;
+  try {
+    currentUser = await db.query.user.findFirst({
+      where: eq(user.email, customer.email),
+    });
+    console.log("Attempted to find user with email:", customer.email, "Result:", currentUser);
+  } catch (error) {
+    console.error("Error querying for currentUser:", error);
+    return null;
+  }
 
   console.log({ currentUser })
 
   if (!currentUser) {
+    console.log("No currentUser found for email:", customer.email);
     return null;
   }
 
-  const userOrganization = await db.query.member.findFirst({
-    where: eq(member.userId, currentUser.id),
-  });
+  let userOrganization;
+  try {
+    userOrganization = await db.query.member.findFirst({
+      where: eq(member.userId, currentUser.id),
+    });
+    console.log("Attempted to find organization for userId:", currentUser.id, "Result:", userOrganization);
+  } catch (error) {
+    console.error("Error querying for userOrganization:", error);
+    return null;
+  }
 
   console.log({ userOrganization })
 
@@ -324,7 +339,9 @@ export async function createSubscription(
           );
       }
 
-      if (lockedTickets.length >= result[0].ticketQuota) {
+      // Check if result exists and has data before accessing ticketQuota
+      if (result && result.length > 0 && lockedTickets.length >= result[0].ticketQuota) {
+        console.log(`User ${userId} exceeded ticket quota. Locked tickets: ${lockedTickets.length}, Quota: ${result[0].ticketQuota}`);
         await db
           .insert(log)
           .values({
@@ -336,12 +353,19 @@ export async function createSubscription(
           })
           .returning();
       } else {
-        const [decrement] = await db
-          .update(subscription)
-          .set({
-            customerQuota: sql`${subscription.customerQuota} - ${lockedTickets.length}`,
-          })
-          .where(eq(subscription.id, result[0].id));
+        // Check if result exists and has data before decrementing
+        if (result && result.length > 0) {
+          console.log(`Decrementing subscription quota. Locked tickets: ${lockedTickets.length}`);
+          const [decrement] = await db
+            .update(subscription)
+            .set({
+              customerQuota: sql`${subscription.customerQuota} - ${lockedTickets.length}`,
+            })
+            .where(eq(subscription.id, result[0].id));
+          console.log("Decrement result:", decrement); // Log decrement result if needed
+        } else {
+          console.log("Skipping quota decrement because subscription result is missing.");
+        }
       }
     } catch (error) {
       console.error("Error decrementing customer quota:", error);
@@ -349,7 +373,7 @@ export async function createSubscription(
     }
 
     if (result && result.length > 0) {
-      console.error("Subscription upsert for user", userId, "returned no data.")
+      console.log("Subscription upsert successful for user", userId, "Result:", result[0]);
       return result[0] as Subscription;
     } else {
       console.error(`Subscription upsert for user ${userId} returned no data.`);

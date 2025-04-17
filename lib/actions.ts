@@ -221,55 +221,65 @@ export async function createSubscription(
 ): Promise<Subscription | null> {
   // Create structured logger for better tracking
   const logger = {
-    info: (message: string, data?: any) => console.log(`[Subscription:${userId}:INFO] ${message}`, data || ''),
-    error: (message: string, error?: any) => console.error(`[Subscription:${userId}:ERROR] ${message}`, error || ''),
-    warn: (message: string, data?: any) => console.warn(`[Subscription:${userId}:WARN] ${message}`, data || '')
+    info: (message: string, data?: any) =>
+      console.log(`[Subscription:${userId}:INFO] ${message}`, data || ""),
+    error: (message: string, error?: any) =>
+      console.error(`[Subscription:${userId}:ERROR] ${message}`, error || ""),
+    warn: (message: string, data?: any) =>
+      console.warn(`[Subscription:${userId}:WARN] ${message}`, data || ""),
   };
 
-  logger.info('Create Subscription triggered', { userId, type });
+  logger.info("Create Subscription triggered", { userId, type });
 
   try {
     // Step 1: Validate inputs
     if (!userId) {
-      logger.error('Invalid userId provided');
-      throw new Error('Invalid userId provided');
+      logger.error("Invalid userId provided");
+      throw new Error("Invalid userId provided");
     }
 
     if (!type || !SUBSCRIPTION_QUOTAS[type]) {
-      logger.error('Invalid subscription type', { type });
+      logger.error("Invalid subscription type", { type });
       throw new Error(`Invalid subscription type: ${type}`);
     }
 
     // Step 2: Get user directly from the database first
     // In case of auth adapter issues, we can still proceed if we have a valid user ID in the database
-    logger.info('Fetching user membership information');
-    const currentMember = await db.query.member.findFirst({
-      where: eq(member.userId, userId),
+    logger.info("Fetching user membership information");
+    const currentMember = await auth.api.getFullOrganization({
+      headers: await headers(),
     });
 
     if (!currentMember) {
-      logger.error('Member record not found in database');
+      logger.error("Member record not found in database");
       throw new Error(`Member record not found for userId: ${userId}`);
     }
 
-    logger.info('Member record found', { memberId: currentMember.id });
+    logger.info("Member record found", { memberId: currentMember.id });
 
     // Step 3: Get organization information
-    if (!currentMember.organizationId) {
-      logger.error('Member has no organization ID');
-      throw new Error('Member has no associated organization');
+    if (!currentMember) {
+      logger.error("Member has no organization ID");
+      throw new Error("Member has no associated organization");
     }
 
     const userOrganization = await db.query.organization.findFirst({
-      where: eq(organization.id, currentMember.organizationId),
+      where: eq(organization.id, currentMember.id),
     });
 
     if (!userOrganization) {
-      logger.error('Organization not found', { organizationId: currentMember.organizationId });
-      throw new Error(`Organization not found with ID: ${currentMember.organizationId}`);
+      logger.error("Organization not found", {
+        organizationId: currentMember.id,
+      });
+      throw new Error(
+        `Organization not found with ID: ${currentMember.id}`
+      );
     }
 
-    logger.info('Organization found', { organizationId: userOrganization.id, name: userOrganization.name });
+    logger.info("Organization found", {
+      organizationId: userOrganization.id,
+      name: userOrganization.name,
+    });
 
     // Step 4: Prepare subscription data
     const subscriptionPlan = SUBSCRIPTION_QUOTAS[type];
@@ -294,14 +304,14 @@ export async function createSubscription(
       updatedAt: new Date(),
     };
 
-    logger.info('Prepared subscription data', { plan: type });
+    logger.info("Prepared subscription data", { plan: type });
 
     // Step 5: Perform the subscription upsert in a transaction
     try {
       // Use transaction to ensure data consistency
       return await db.transaction(async (tx) => {
         // Insert or update the subscription
-        logger.info('Upserting subscription');
+        logger.info("Upserting subscription");
         const result = await tx
           .insert(subscription)
           .values(insertValues)
@@ -312,15 +322,17 @@ export async function createSubscription(
           .returning();
 
         if (!result || result.length === 0) {
-          logger.error('Subscription upsert failed - no result returned');
-          throw new Error('Subscription upsert failed - no result returned');
+          logger.error("Subscription upsert failed - no result returned");
+          throw new Error("Subscription upsert failed - no result returned");
         }
 
         const newSubscription = result[0] as Subscription;
-        logger.info('Subscription upserted successfully', { subscriptionId: newSubscription.id });
+        logger.info("Subscription upserted successfully", {
+          subscriptionId: newSubscription.id,
+        });
 
         // Step 6: Handle locked tickets
-        logger.info('Checking for locked tickets');
+        logger.info("Checking for locked tickets");
         const lockedTickets = await tx
           .select()
           .from(ticket)
@@ -332,11 +344,11 @@ export async function createSubscription(
           );
 
         const lockedCount = lockedTickets.length;
-        logger.info('Found locked tickets', { count: lockedCount });
+        logger.info("Found locked tickets", { count: lockedCount });
 
         // Unlock tickets based on new subscription
         if (lockedCount > 0) {
-          logger.info('Unlocking tickets', { count: lockedCount });
+          logger.info("Unlocking tickets", { count: lockedCount });
           await tx
             .update(ticket)
             .set({ isOverQuota: false })
@@ -350,23 +362,23 @@ export async function createSubscription(
 
         // Check if quota is exceeded even after subscription change
         if (lockedCount >= newSubscription.ticketQuota) {
-          logger.warn('Ticket quota exceeded after subscription change', {
+          logger.warn("Ticket quota exceeded after subscription change", {
             lockedCount,
-            quota: newSubscription.ticketQuota
+            quota: newSubscription.ticketQuota,
           });
-          
-          await tx
-            .insert(log)
-            .values({
-              id: uuidv4(),
-              title: "Ticket Quota Exceeded",
-              description: `User ${userId} has exceeded their ticket quota after subscription change.`,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            });
+
+          await tx.insert(log).values({
+            id: uuidv4(),
+            title: "Ticket Quota Exceeded",
+            description: `User ${userId} has exceeded their ticket quota after subscription change.`,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
         } else if (lockedCount > 0) {
           // Decrement quota by the number of unlocked tickets
-          logger.info('Decrementing quota for unlocked tickets', { count: lockedCount });
+          logger.info("Decrementing quota for unlocked tickets", {
+            count: lockedCount,
+          });
           await tx
             .update(subscription)
             .set({
@@ -375,16 +387,16 @@ export async function createSubscription(
             .where(eq(subscription.id, newSubscription.id));
         }
 
-        logger.info('Subscription process completed successfully');
+        logger.info("Subscription process completed successfully");
         return newSubscription;
       });
     } catch (error) {
-      logger.error('Transaction failed during subscription process', error);
+      logger.error("Transaction failed during subscription process", error);
       throw error; // Re-throw to be caught by outer try-catch
     }
   } catch (err) {
-    logger.error('Subscription creation failed', err);
-    
+    logger.error("Subscription creation failed", err);
+
     // Log to database for persistent error tracking
     try {
       await db.insert(log).values({
@@ -395,9 +407,9 @@ export async function createSubscription(
         updatedAt: new Date(),
       });
     } catch (logError) {
-      logger.error('Failed to log error to database', logError);
+      logger.error("Failed to log error to database", logError);
     }
-    
+
     return null;
   }
 }

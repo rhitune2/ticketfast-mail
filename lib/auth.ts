@@ -248,10 +248,7 @@ export const auth = betterAuth({
             slug: "free",
           },
           {
-            productId:
-              process.env.NODE_ENV === "development"
-                ? "d73591b0-ed35-40ea-97dd-378f548754c0"
-                : "069a9886-ebdd-45c2-b540-a4d61b2281c8",
+            productId:"d73591b0-ed35-40ea-97dd-378f548754c0",
             slug: "pro",
           },
           {

@@ -1,6 +1,14 @@
 import { betterAuth, User } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db, inbox, invitation, Member, member, subscription, user } from "@/db";
+import {
+  db,
+  inbox,
+  invitation,
+  Member,
+  member,
+  subscription,
+  user,
+} from "@/db";
 import { organization } from "better-auth/plugins/organization";
 import { polar } from "@polar-sh/better-auth";
 import { Polar } from "@polar-sh/sdk";
@@ -18,12 +26,17 @@ import { SUBSCRIPTION_QUOTAS } from "@/lib/constants";
 import { eq } from "drizzle-orm";
 import { createAuthMiddleware } from "better-auth/api";
 
+// const client = new Polar({
+//   accessToken:
+//     process.env.NODE_ENV === "development"
+//       ? process.env.POLAR_ACCESS_TOKEN_SANDBOX
+//       : process.env.POLAR_ACCESS_TOKEN,
+//   server: process.env.NODE_ENV === "development" ? "sandbox" : "production",
+// });
+
 const client = new Polar({
-  accessToken:
-    process.env.NODE_ENV === "development"
-      ? process.env.POLAR_ACCESS_TOKEN_SANDBOX
-      : process.env.POLAR_ACCESS_TOKEN,
-  server: process.env.NODE_ENV === "development" ? "sandbox" : "production",
+  accessToken: process.env.POLAR_ACCESS_TOKEN_SANDBOX,
+  server: "sandbox",
 });
 
 export const auth = betterAuth({
@@ -175,7 +188,9 @@ export const auth = betterAuth({
             case "pro":
               return SUBSCRIPTION_QUOTAS.pro.organization.memberQuota + 1;
             case "enterprise":
-              return SUBSCRIPTION_QUOTAS.enterprise.organization.memberQuota + 1;
+              return (
+                SUBSCRIPTION_QUOTAS.enterprise.organization.memberQuota + 1
+              );
             default:
               return SUBSCRIPTION_QUOTAS.free.organization.memberQuota + 1;
           }
@@ -255,7 +270,7 @@ export const auth = betterAuth({
         //   ? process.env.POLAR_WEBHOOK_SECRET_SANDBOX!
         //   : process.env.POLAR_WEBHOOK_SECRET!,
         onSubscriptionCreated: async (payload) => {
-          const externalId = payload.data.customer.externalId
+          const externalId = payload.data.customer.externalId;
           await createSubscription(
             externalId!,
             payload.data.product.name as "free" | "pro" | "enterprise"
@@ -279,4 +294,4 @@ export const auth = betterAuth({
 });
 
 export type Session = typeof auth.$Infer.Session;
-export type Organization = typeof auth.$Infer.Organization
+export type Organization = typeof auth.$Infer.Organization;

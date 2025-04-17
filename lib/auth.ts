@@ -253,9 +253,10 @@ export const auth = betterAuth({
       },
       webhooks: {
         secret:
-          process.env.NODE_ENV === "development"
-            ? process.env.POLAR_WEBHOOK_SECRET_SANDBOX!
-            : process.env.POLAR_WEBHOOK_SECRET!,
+        process.env.POLAR_WEVHOOK_SECRET_SANDBOX!,
+          // process.env.NODE_ENV === "development"
+          //   ? process.env.POLAR_WEBHOOK_SECRET_SANDBOX!
+          //   : process.env.POLAR_WEBHOOK_SECRET!,
         onSubscriptionCreated: async (payload) => {
           console.log("Subscription created:", payload);
           console.log(payload.data);

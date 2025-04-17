@@ -219,194 +219,55 @@ export async function createSubscription(
   userId: string,
   type: "free" | "pro" | "enterprise"
 ): Promise<Subscription | null> {
-  // Create structured logger for better tracking
-  const logger = {
-    info: (message: string, data?: any) =>
-      console.log(`[Subscription:${userId}:INFO] ${message}`, data || ""),
-    error: (message: string, error?: any) =>
-      console.error(`[Subscription:${userId}:ERROR] ${message}`, error || ""),
-    warn: (message: string, data?: any) =>
-      console.warn(`[Subscription:${userId}:WARN] ${message}`, data || ""),
-  };
 
-  logger.info("Create Subscription triggered", { userId, type });
+  console.log({ userId, type });
+  console.log("Attempting to get current user.")
+  const currentUser = await db.query.user.findFirst({
+    where: eq(user.id, userId),
+  });
+  console.log("Got current user query")
 
-  try {
-    // Step 1: Validate inputs
-    if (!userId) {
-      logger.error("Invalid userId provided");
-      throw new Error("Invalid userId provided");
-    }
-
-    if (!type || !SUBSCRIPTION_QUOTAS[type]) {
-      logger.error("Invalid subscription type", { type });
-      throw new Error(`Invalid subscription type: ${type}`);
-    }
-
-    // Step 2: Get user directly from the database first
-    // In case of auth adapter issues, we can still proceed if we have a valid user ID in the database
-    logger.info("Fetching user membership information");
-
-    const currentUser = await db.select().from(user).where(eq(user.id, userId));
-
-    if (!currentUser) {
-      logger.error("User record not found in database");
-      throw new Error(`User record not found for userId: ${userId}`);
-    }
-
-    logger.info("User record found", { userId: currentUser[0].id });
-
-    // Step 3: Get organization information
-    if (!currentUser) {
-      logger.error("User has no organization ID");
-      throw new Error("User has no associated organization");
-    }
-
-    const userOrganization = await db.query.organization.findFirst({
-      where: eq(organization.id, currentUser[0].id),
-    });
-
-    if (!userOrganization) {
-      logger.error("Organization not found", {
-        organizationId: currentUser[0].id,
-      });
-      throw new Error(`Organization not found with ID: ${currentUser[0].id}`);
-    }
-
-    logger.info("Organization found", {
-      organizationId: userOrganization.id,
-      name: userOrganization.name,
-    });
-
-    // Step 4: Prepare subscription data
-    const subscriptionPlan = SUBSCRIPTION_QUOTAS[type];
-    const baseSubscriptionData = {
-      plan: type,
-      customerQuota: subscriptionPlan.customerQuota,
-      organizationQuota: subscriptionPlan.organization.quota,
-      ticketQuota: subscriptionPlan.ticketQuota,
-      status: "ACTIVE" as const,
-    };
-
-    const updateValues = {
-      ...baseSubscriptionData,
-      updatedAt: new Date(),
-    };
-
-    const insertValues = {
-      id: uuidv4(),
-      userId: userId,
-      ...baseSubscriptionData,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    logger.info("Prepared subscription data", { plan: type });
-
-    // Step 5: Perform the subscription upsert in a transaction
-    try {
-      // Use transaction to ensure data consistency
-      return await db.transaction(async (tx) => {
-        // Insert or update the subscription
-        logger.info("Upserting subscription");
-        const result = await tx
-          .insert(subscription)
-          .values(insertValues)
-          .onConflictDoUpdate({
-            target: subscription.userId,
-            set: updateValues,
-          })
-          .returning();
-
-        if (!result || result.length === 0) {
-          logger.error("Subscription upsert failed - no result returned");
-          throw new Error("Subscription upsert failed - no result returned");
-        }
-
-        const newSubscription = result[0] as Subscription;
-        logger.info("Subscription upserted successfully", {
-          subscriptionId: newSubscription.id,
-        });
-
-        // Step 6: Handle locked tickets
-        logger.info("Checking for locked tickets");
-        const lockedTickets = await tx
-          .select()
-          .from(ticket)
-          .where(
-            and(
-              eq(ticket.organizationId, userOrganization.id!),
-              eq(ticket.isOverQuota, true)
-            )
-          );
-
-        const lockedCount = lockedTickets.length;
-        logger.info("Found locked tickets", { count: lockedCount });
-
-        // Unlock tickets based on new subscription
-        if (lockedCount > 0) {
-          logger.info("Unlocking tickets", { count: lockedCount });
-          await tx
-            .update(ticket)
-            .set({ isOverQuota: false })
-            .where(
-              and(
-                eq(ticket.organizationId, userOrganization.id!),
-                eq(ticket.isOverQuota, true)
-              )
-            );
-        }
-
-        // Check if quota is exceeded even after subscription change
-        if (lockedCount >= newSubscription.ticketQuota) {
-          logger.warn("Ticket quota exceeded after subscription change", {
-            lockedCount,
-            quota: newSubscription.ticketQuota,
-          });
-
-          await tx.insert(log).values({
-            id: uuidv4(),
-            title: "Ticket Quota Exceeded",
-            description: `User ${userId} has exceeded their ticket quota after subscription change.`,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-        } else if (lockedCount > 0) {
-          // Decrement quota by the number of unlocked tickets
-          logger.info("Decrementing quota for unlocked tickets", {
-            count: lockedCount,
-          });
-          await tx
-            .update(subscription)
-            .set({
-              customerQuota: sql`${subscription.customerQuota} - ${lockedCount}`,
-            })
-            .where(eq(subscription.id, newSubscription.id));
-        }
-
-        logger.info("Subscription process completed successfully");
-        return newSubscription;
-      });
-    } catch (error) {
-      logger.error("Transaction failed during subscription process", error);
-      throw error; // Re-throw to be caught by outer try-catch
-    }
-  } catch (err) {
-    logger.error("Subscription creation failed", err);
-
-    // Log to database for persistent error tracking
-    try {
-      await db.insert(log).values({
-        id: uuidv4(),
-        title: "Subscription Creation Failed",
-        description: `Failed to create subscription for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-    } catch (logError) {
-      logger.error("Failed to log error to database", logError);
-    }
-
+  if (!currentUser) {
+    console.log("User not found");
     return null;
   }
+  console.log({ currentUser })
+
+  const memberOrganization = await db.query.member.findFirst({
+    where: eq(member.userId, userId),
+  });
+  console.log({memberOrganization})
+
+  if(!memberOrganization){
+    console.log("Member organization not found.")
+    return null;
+  }
+
+  const organizationId = memberOrganization.organizationId;
+  console.log({ organizationId })
+
+  if(!organizationId){
+    console.log("Not found organization ID")
+    return null;
+  }
+
+  const ownerOfOrganization = await db.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+  })
+  console.log({ ownerOfOrganization })
+
+  if(!ownerOfOrganization){
+    console.log("Owner of organization not found.")
+    return null;
+  }
+
+  const currentSubscription = await db.query.subscription.findFirst({
+    where: eq(subscription.userId, ownerOfOrganization.id),
+  });
+
+  console.log({ currentSubscription })
+  console.log("Found current subscription. attemping to upgrade.")
+  
+
+  return currentSubscription as Subscription | null;
 }

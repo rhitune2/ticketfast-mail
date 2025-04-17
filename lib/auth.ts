@@ -255,10 +255,10 @@ export const auth = betterAuth({
         //   ? process.env.POLAR_WEBHOOK_SECRET_SANDBOX!
         //   : process.env.POLAR_WEBHOOK_SECRET!,
         onSubscriptionCreated: async (payload) => {
-          const data = payload.data;
+          const externalId = payload.data.customer.externalId
           await createSubscription(
-            data,
-            data.product.name as "free" | "pro" | "enterprise"
+            externalId!,
+            payload.data.product.name as "free" | "pro" | "enterprise"
           );
         },
         onSubscriptionUpdated: async (payload) => {

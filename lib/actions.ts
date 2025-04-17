@@ -216,70 +216,23 @@ export async function getOrganizationSubscription({
 }
 
 export async function createSubscription(
-  payload: any,
+  userId: string,
   type: "free" | "pro" | "enterprise"
 ): Promise<Subscription | null> {
+  
+  console.log("Create Subscription triggered" , { userId, type })
 
-  // const client = new Polar({
-  //   accessToken:
-  //     process.env.NODE_ENV === "development"
-  //       ? process.env.POLAR_ACCESS_TOKEN_SANDBOX
-  //       : process.env.POLAR_ACCESS_TOKEN,
-  //   server: process.env.NODE_ENV === "development" ? "sandbox" : "production",
-  // });
+  const currentUser = await db.query.user.findFirst({ where :eq(user.id, userId)})
 
-  const client = new Polar({
-    accessToken: process.env.POLAR_ACCESS_TOKEN_SANDBOX!,
-    server: "sandbox",
-  })
-
-  const customer = await client.customers.get({
-    id: payload.customer.id,
-  });
-
-  console.log({ customer })
-
-  let currentUser;
-  try {
-    currentUser = await db.query.user.findFirst({
-      where: eq(user.id, customer.externalId!),
-    });
-    console.log("Attempted to find user with email:", customer.email, "Result:", currentUser);
-  } catch (error) {
-    console.error("Error querying for currentUser:", error);
+  if(!currentUser){
     return null;
   }
 
-  console.log({ currentUser })
+  const userOrganization = await db.query.member.findFirst({ where :eq(member.userId, userId)})
 
-  if (!currentUser) {
-    console.log("No currentUser found for email:", customer.email);
+  if(!userOrganization){
     return null;
   }
-
-  let userOrganization;
-  try {
-    userOrganization = await db.query.member.findFirst({
-      where: eq(member.userId, currentUser.id),
-    });
-    console.log("Attempted to find organization for userId:", currentUser.id, "Result:", userOrganization);
-  } catch (error) {
-    console.error("Error querying for userOrganization:", error);
-    return null;
-  }
-
-  console.log({ userOrganization })
-
-  // We need to ensure we have a valid userId
-  if (!userOrganization || !userOrganization.userId) {
-    console.error(
-      `No organization membership found for user: ${currentUser.email}`
-    );
-    return null;
-  }
-
-  // userId is now guaranteed to be defined
-  const userId = userOrganization.userId;
 
   const baseSubscriptionData = {
     plan: type,
@@ -309,7 +262,7 @@ export async function createSubscription(
       .insert(subscription)
       .values(insertValues)
       .onConflictDoUpdate({
-        target: subscription.userId,
+        target: subscription.userId, // Specify the conflict target column
         set: updateValues,
       })
       .returning();

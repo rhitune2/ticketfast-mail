@@ -246,34 +246,31 @@ export async function createSubscription(
     // Step 2: Get user directly from the database first
     // In case of auth adapter issues, we can still proceed if we have a valid user ID in the database
     logger.info("Fetching user membership information");
-    const currentMember = await auth.api.getFullOrganization({
-      headers: await headers(),
-    });
 
-    if (!currentMember) {
-      logger.error("Member record not found in database");
-      throw new Error(`Member record not found for userId: ${userId}`);
+    const currentUser = await db.select().from(user).where(eq(user.id, userId));
+
+    if (!currentUser) {
+      logger.error("User record not found in database");
+      throw new Error(`User record not found for userId: ${userId}`);
     }
 
-    logger.info("Member record found", { memberId: currentMember.id });
+    logger.info("User record found", { userId: currentUser[0].id });
 
     // Step 3: Get organization information
-    if (!currentMember) {
-      logger.error("Member has no organization ID");
-      throw new Error("Member has no associated organization");
+    if (!currentUser) {
+      logger.error("User has no organization ID");
+      throw new Error("User has no associated organization");
     }
 
     const userOrganization = await db.query.organization.findFirst({
-      where: eq(organization.id, currentMember.id),
+      where: eq(organization.id, currentUser[0].id),
     });
 
     if (!userOrganization) {
       logger.error("Organization not found", {
-        organizationId: currentMember.id,
+        organizationId: currentUser[0].id,
       });
-      throw new Error(
-        `Organization not found with ID: ${currentMember.id}`
-      );
+      throw new Error(`Organization not found with ID: ${currentUser[0].id}`);
     }
 
     logger.info("Organization found", {

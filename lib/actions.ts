@@ -242,7 +242,7 @@ export async function createSubscription(
   let currentUser;
   try {
     currentUser = await db.query.user.findFirst({
-      where: eq(user.email, customer.email),
+      where: eq(user.id, customer.externalId!),
     });
     console.log("Attempted to find user with email:", customer.email, "Result:", currentUser);
   } catch (error) {

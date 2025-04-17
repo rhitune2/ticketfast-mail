@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { User } from "@/db";
+import { Member, User } from "@/db";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -58,7 +58,7 @@ import { authClient } from "@/lib/auth-client";
 import { SUBSCRIPTION_QUOTAS } from "@/lib/constants";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import type { Organization as BaseOrganization } from "@/lib/auth";
+import type { Organization as BaseOrganization, Organization } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 
 // Extend the Organization type to include members and orgSession
@@ -104,7 +104,9 @@ type MemberWithUser = {
 };
 
 interface TeamTabProps {
-  organization: ExtendedOrganization; // Using our extended organization type
+  organization: Organization & {
+    members: Member[];
+  };
   isOwner: boolean;
   organizationName: string;
   setOrganizationName: (name: string) => void;
@@ -567,7 +569,7 @@ export function TeamTab({
         <div className="mt-6">
           <h4 className="text-sm font-medium mb-3">Current Members</h4>
           <div className="space-y-2">
-            {members.map((member: MemberWithUser) => (
+            {members.map((member : any) => (
               <div
                 key={member.userId}
                 className="flex items-center justify-between p-3 rounded-md border"

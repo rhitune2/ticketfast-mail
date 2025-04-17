@@ -32,7 +32,8 @@ export default async function GeneralSettingsPage() {
   return (
     <SettingsTabs
       session={session!}
-      organization={organization!}
+      // any for now.
+      organization={organization! as any}
       isOwner={isOwnerOrAdmin}
       subscription={subscription!}
       smtpSettings={smtpSettings}

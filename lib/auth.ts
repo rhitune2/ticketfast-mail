@@ -1,6 +1,6 @@
-import { betterAuth } from "better-auth";
+import { betterAuth, User } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db, inbox, invitation, member, subscription, user } from "@/db";
+import { db, inbox, invitation, Member, member, subscription, user } from "@/db";
 import { organization } from "better-auth/plugins/organization";
 import { polar } from "@polar-sh/better-auth";
 import { Polar } from "@polar-sh/sdk";
@@ -276,4 +276,4 @@ export const auth = betterAuth({
 });
 
 export type Session = typeof auth.$Infer.Session;
-export type Organization = typeof auth.$Infer.Organization;
+export type Organization = typeof auth.$Infer.Organization

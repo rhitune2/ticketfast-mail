@@ -37,10 +37,10 @@ const emailSettingsSchema = z.object({
   port: z.coerce.number().int().positive("Port must be a positive integer"),
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
-  // secure: z.boolean().default(true),
+  secure: z.boolean(),
   fromEmail: z.string().email("Invalid email address"),
   fromName: z.string().optional(),
-  isUsingSmtp: z.boolean().default(false), // Add isUsingSmtp
+  isUsingSmtp: z.boolean(),
 });
 
 type EmailSettingsFormValues = z.infer<typeof emailSettingsSchema>;
@@ -66,10 +66,10 @@ export function EmailTab({
       port: initialData?.port || 587,
       username: initialData?.username || "",
       password: initialData?.password || "", // Consider masking or not pre-filling
-      // secure: true,
+      secure: initialData?.secure ?? true,
       fromEmail: initialData?.fromEmail || "",
       fromName: initialData?.fromName || "",
-      isUsingSmtp: initialData?.isUsingSmtp ?? false, // Set default for isUsingSmtp
+      isUsingSmtp: initialData?.isUsingSmtp ?? false,
     },
     disabled: !isOwner, // Disable form if not owner/admin
   });
@@ -293,7 +293,7 @@ export function EmailTab({
                       </FormItem>
                     )}
                   />
-                  {/* <FormField
+                  <FormField
                     control={form.control}
                     name="secure"
                     render={({ field }) => (
@@ -314,7 +314,7 @@ export function EmailTab({
                         </FormControl>
                       </FormItem>
                     )}
-                  /> */}
+                  />
                 </div>
               </div>
             )}
